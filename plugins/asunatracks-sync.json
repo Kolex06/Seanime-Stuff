@@ -7,7 +7,7 @@
   "type": "plugin",
   "description": "Live-sync Seanime/AniList anime and manga progress to AsunaTracks, with manual full-library sync when you need to catch up.",
   "author": "AsunaTracks",
-  "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/asunatracks.svg",
+  "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/asunatracks-logo.png",
   "website": "https://asunatracks.space",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AsunaTracksSync/README.md",
   "notes": "Sign in from the tray with your AsunaTracks account. You must also be logged in with AniList in Seanime and enable Automatically update progress in the app settings for live sync to work. Use Sync Anime or Sync Manga once for your current library, then leave live sync on for future progress, status, repeat, and delete updates. Private AniList entries are skipped.",
