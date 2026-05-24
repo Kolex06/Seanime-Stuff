@@ -903,7 +903,7 @@ function init() {
 
                     let dubIdSetPromise = null;
                     const dragScrollEnhancementVersion = 'v4';
-                    const marketplaceEnhancementVersion = 'v8';
+                    const marketplaceEnhancementVersion = 'v9';
                     const catalogActionSources = new Map();
                     let allExtensionsPromise = null;
                     let extensionUpdatesPromise = null;
@@ -2806,7 +2806,12 @@ function init() {
                             addCloneAction(actions, 'Info', MORE_ICON, 'more', sourceId);
                             addCloneAction(actions, 'Code', CODE_ICON, 'code', sourceId);
 
-                            addCloneAction(actions, 'Documentation', DOCUMENTATION_ICON, 'documentation', sourceId);
+                            hasDocumentationForCard(sourceCard).then(hasDocumentation => {
+                                if (!hasDocumentation) return;
+                                if (!actions.isConnected) return;
+
+                                addCloneAction(actions, 'Documentation', DOCUMENTATION_ICON, 'documentation', sourceId);
+                            });
 
                             if (isKolex06VersionExtension(data) || sourceCardHasNativePreferences(sourceCard)) {
                                 addCloneAction(actions, 'Preferences', SETTINGS_ICON, 'preferences', sourceId);

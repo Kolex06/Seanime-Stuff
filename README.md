@@ -18,7 +18,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 
 | Extension | Version | ID | Description |
 | --- | --- | --- | --- |
-| SeaUtils Kolex06-Version | 1.2.21 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, and tray preferences. |
+| SeaUtils Kolex06-Version | 1.2.22 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, and tray preferences. |
 | AsunaTracks Sync | 0.1.13 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
@@ -29,7 +29,7 @@ Features include:
 
 - Better marketplace and Full Catalog layout.
 - Blue update styling for extension cards when an update is available.
-- Full Catalog action buttons for Info, Preferences, Code, and Documentation.
+- Full Catalog action buttons for Info, Preferences, Code, and Documentation when available.
 - Update actions such as View updated code and Install update in the extension info popup.
 - Horizontal carousel rows for media grids.
 - Sub/dub and captions badges on media cards.
