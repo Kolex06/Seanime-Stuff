@@ -1,7 +1,7 @@
 {
   "id": "SeaUtils-Kolex06-Version",
   "name": "SeaUtils Kolex06-Version",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/plugins/SeaUtils-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
@@ -26,7 +26,9 @@
           }
         ],
         "networkAccess": {
-          "allowedDomains": "raw.githubusercontent.com",
+          "allowedDomains": [
+            "raw.githubusercontent.com"
+          ],
           "reasoning": "Required to load the SeaUtils tray icon PNG from GitHub raw."
         }
       }
