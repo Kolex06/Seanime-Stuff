@@ -10,7 +10,7 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/marketpl
 
 ## Included
 
-- SeaUtils
+- SeaUtils Kolex06-Version
 - AsunaTracks Sync
 
 ## Direct Manifest URLs
