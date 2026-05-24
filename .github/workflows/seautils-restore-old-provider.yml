@@ -1,4 +1,5 @@
 name: One-time SeaUtils old provider restore
+# trigger: 1.2.30
 
 on:
   push:
