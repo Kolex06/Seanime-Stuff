@@ -16,6 +16,6 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/marketpl
 ## Direct Manifest URLs
 
 ```text
-https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtils.json
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtils-Kolex06-Version.json
 https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/asunatracks-sync.json
 ```
