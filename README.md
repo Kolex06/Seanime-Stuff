@@ -42,6 +42,12 @@ Direct manifest:
 https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtils-Kolex06-Version.json
 ```
 
+Source code:
+
+```text
+https://github.com/Kolex06/Seanime-Stuff/blob/main/plugins/SeaUtilsKolex06Version/provider.ts
+```
+
 Icon:
 
 ```text
@@ -91,6 +97,8 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/as
 marketplace.json
 plugins/
   SeaUtils-Kolex06-Version.json
+  SeaUtilsKolex06Version/
+    provider.ts
   asunatracks-sync.json
   AsunaTracksSync/
     README.md
