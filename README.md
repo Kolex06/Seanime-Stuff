@@ -18,7 +18,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 
 | Extension | Version | ID | Description |
 | --- | --- | --- | --- |
-| SeaUtils Kolex06-Version | 1.2.29 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, and tray preferences. |
+| SeaUtils Kolex06-Version | 1.2.30 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, and tray preferences. |
 | AsunaTracks Sync | 0.1.13 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
@@ -28,13 +28,10 @@ SeaUtils Kolex06-Version is the current Kolex06 version of SeaUtils.
 Features include:
 
 - Better marketplace and Full Catalog layout.
-- Blue update styling for extension cards when an update is available.
-- Full Catalog action buttons for Info, Preferences, Code, and Documentation when available.
-- Update actions such as View updated code and Install update in the extension info popup.
 - Horizontal carousel rows for media grids.
 - Sub/dub and captions badges on media cards.
 - Tray preferences for turning SeaUtils features on or off.
-- Raw PNG icon support from this repo.
+- Full Catalog actions for installed extension info, code, and preferences when available.
 
 Direct manifest:
 
@@ -86,10 +83,10 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/as
 
 ## Notes
 
-- Use `SeaUtils-Kolex06-Version.json` for SeaUtils Kolex06-Version.
-- Seanime only detects extension updates when the manifest version is higher than the installed version.
+- Use `SeaUtils-Kolex06-Version.json` for SeaUtils Kolex06-Version. The old `SeaUtils.json` path is only used as the legacy source payload for the restored provider.
+- SeaAnime/Seanime only detects extension updates when the manifest version is higher than the installed version.
 - The marketplace file and plugin manifests should stay on matching versions.
-- Icons are hosted as raw PNG files from this repo.
+- Icons are hosted as raw files from this repo.
 
 ## Repository Layout
 
