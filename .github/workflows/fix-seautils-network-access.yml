@@ -1,0 +1,73 @@
+name: Fix SeaUtils network access
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-seautils-network-access.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix SeaUtils allowedDomains schema
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const fixedId = 'SeaUtils-Kolex06-Version';
+          const fixedVersion = '1.2.19';
+          const rawIcon = 'https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/SeaUtils-Kolex06-Version.png';
+          const manifestPath = 'plugins/SeaUtils-Kolex06-Version.json';
+          const marketplacePath = 'marketplace.json';
+          const workflowPath = '.github/workflows/fix-seautils-network-access.yml';
+
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, ''));
+          manifest.version = fixedVersion;
+          manifest.icon = rawIcon;
+          manifest.plugin = manifest.plugin || {};
+          manifest.plugin.version = manifest.plugin.version || '1';
+          manifest.plugin.permissions = manifest.plugin.permissions || {};
+          manifest.plugin.permissions.scopes = Array.from(new Set([...(manifest.plugin.permissions.scopes || []), 'storage']));
+          manifest.plugin.permissions.allow = manifest.plugin.permissions.allow || {};
+          manifest.plugin.permissions.allow.networkAccess = {
+            allowedDomains: ['raw.githubusercontent.com'],
+            reasoning: 'Required to load the SeaUtils tray icon PNG from GitHub raw.'
+          };
+
+          if (typeof manifest.payload !== 'string') throw new Error('SeaUtils payload is missing');
+          if (!/const trayIconUrl = [^\n]+/.test(manifest.payload)) {
+            throw new Error('SeaUtils trayIconUrl line was not found');
+          }
+          manifest.payload = manifest.payload
+            .replace(/const trayIconUrl = [^\n]+/, 'const trayIconUrl = ' + JSON.stringify(rawIcon))
+            .replaceAll('data:image/png;base64,', 'data:image/png;base64,');
+
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+
+          const marketplace = JSON.parse(fs.readFileSync(marketplacePath, 'utf8').replace(/^\uFEFF/, ''));
+          const entry = marketplace.find(item => item && item.id === fixedId);
+          if (!entry) throw new Error('SeaUtils marketplace entry not found');
+          entry.version = fixedVersion;
+          entry.icon = rawIcon;
+          fs.writeFileSync(marketplacePath, JSON.stringify(marketplace, null, 2) + '\n');
+
+          if (fs.existsSync(workflowPath)) fs.rmSync(workflowPath);
+          NODE
+
+      - name: Commit schema fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A plugins/SeaUtils-Kolex06-Version.json marketplace.json .github/workflows/fix-seautils-network-access.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Fix SeaUtils network access schema"
+            git push
+          fi
