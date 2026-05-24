@@ -10,6 +10,7 @@ interface AmaSettings {
 }
 
 const LEGACY_SEAUTILS_MANIFEST_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/b9b9b0ddabcf3bd4d93cdee04e9155644707fe35/plugins/SeaUtils-Kolex06-Version.json"
+const SEAUTILS_TRAY_ICON_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/SeaUtils-Kolex06-Version.png"
 
 function init() {
     $ui.register(function(ctx) {
@@ -72,10 +73,8 @@ function init() {
         const carouselsRef = ctx.fieldRef<boolean>(settingsState.get().carousels)
         const subDubIconsRef = ctx.fieldRef<boolean>(settingsState.get().subDubIcons)
 
-        const trayIconUrl = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/seautils.svg"
-
         const tray = ctx.newTray({
-            iconUrl: trayIconUrl,
+            iconUrl: SEAUTILS_TRAY_ICON_URL,
             withContent: true,
             width: "320px",
             minHeight: "190px",
@@ -159,24 +158,19 @@ function init() {
             return source.slice(bodyStart, end)
         }
 
-        function evaluateTemplate(template: string): string {
-            try {
-                const renderer = Function(
-                    "initialFeatureSettings",
-                    "return `" + template.replace(/`/g, "\\`") + "`;"
-                )
-
-                return String(renderer(initialFeatureSettings))
-            } catch (_) {
-                return template.replace(
-                    /\$\{JSON\.stringify\(initialFeatureSettings\)\}/g,
-                    JSON.stringify(initialFeatureSettings)
-                )
-            }
+        function hydrateTemplate(template: string): string {
+            return String(template || "").replace(
+                /\$\{JSON\.stringify\(initialFeatureSettings\)\}/g,
+                JSON.stringify(initialFeatureSettings)
+            )
         }
 
         async function loadLegacyPayload(): Promise<string> {
-            const response = await fetch(LEGACY_SEAUTILS_MANIFEST_URL, {
+            const fetcher = (ctx as any).fetch
+                ? (ctx as any).fetch.bind(ctx)
+                : (globalThis as any).fetch.bind(globalThis)
+
+            const response = await fetcher(LEGACY_SEAUTILS_MANIFEST_URL, {
                 cache: "no-store",
             })
 
@@ -200,10 +194,10 @@ function init() {
 
             try {
                 const legacyPayload = await loadLegacyPayload()
-                const carouselCSS = evaluateTemplate(
+                const carouselCSS = hydrateTemplate(
                     extractTemplate(legacyPayload, "const carouselCSS = `", "\n        `;")
                 )
-                const browserScript = evaluateTemplate(
+                const browserScript = hydrateTemplate(
                     extractTemplate(legacyPayload, "script.setText(`", "\n            `);")
                 )
 
