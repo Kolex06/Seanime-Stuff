@@ -17,7 +17,7 @@ Keep AsunaTracks up to date from Seanime. The extension can live-sync list edits
 In Seanime, add this extension manifest URL:
 
 ```text
-https://raw.githubusercontent.com/Kolex06/asunatracks-seanime-sync/main/asunatracks-sync.json
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/asunatracks-sync.json
 ```
 
 Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account, and run `Sync Anime` or `Sync Manga` once. Leave live sync enabled for future Seanime list changes.
@@ -38,4 +38,3 @@ https://asunatracks.space
 ```
 
 Open the profile menu, choose `Settings`, and change the URL to `http://localhost:8000` if you are testing a local AsunaTracks server.
-
