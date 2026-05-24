@@ -1,0 +1,97 @@
+name: SeaUtils hotfix 1.2.23
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/seautils-hotfix-1-2-23.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-seautils:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch SeaUtils
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const version = '1.2.23';
+          const workflowPath = '.github/workflows/seautils-hotfix-1-2-23.yml';
+          const providerPath = 'plugins/SeaUtilsKolex06Version/provider.ts';
+          const manifestPath = 'plugins/SeaUtils-Kolex06-Version.json';
+          const marketplacePath = 'marketplace.json';
+          const readmePath = 'README.md';
+
+          let provider = fs.readFileSync(providerPath, 'utf8').replace(/\r\n/g, '\n');
+
+          provider = provider.replace(/const marketplaceEnhancementVersion = 'v\d+';/, "const marketplaceEnhancementVersion = 'v10';");
+
+          const oldPrefs = `                    async function hasPreferencesForCard(card) {
+                        const extension = await findExtensionForCard(card);
+                        return !!(extension && extension.userConfig);
+                    }`;
+          const newPrefs = `                    async function hasPreferencesForCard(card) {
+                        try {
+                            const extension = await findExtensionForCard(card);
+                            return !!(extension && extension.userConfig);
+                        } catch (_) {
+                            return false;
+                        }
+                    }`;
+          if (provider.includes(oldPrefs)) provider = provider.replace(oldPrefs, newPrefs);
+
+          const oldDocs = `                    async function hasDocumentationForCard(card) {
+                        const extension = await findExtensionForCard(card);
+                        return !!getExtensionDocumentationUrl(extension);
+                    }`;
+          const newDocs = `                    async function hasDocumentationForCard(card) {
+                        try {
+                            const extension = await findExtensionForCard(card);
+                            return !!getExtensionDocumentationUrl(extension);
+                        } catch (_) {
+                            return false;
+                        }
+                    }`;
+          if (provider.includes(oldDocs)) provider = provider.replace(oldDocs, newDocs);
+
+          if (!provider.includes("const marketplaceEnhancementVersion = 'v10';")) {
+            throw new Error('SeaUtils enhancement version was not updated');
+          }
+          if (!provider.includes('async function hasDocumentationForCard(card) {\n                        try {')) {
+            throw new Error('SeaUtils documentation check was not made fail-safe');
+          }
+          if (!provider.includes('async function hasPreferencesForCard(card) {\n                        try {')) {
+            throw new Error('SeaUtils preferences check was not made fail-safe');
+          }
+
+          provider = provider.replace(/\s+$/u, '');
+          fs.writeFileSync(providerPath, provider + '\n');
+
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          manifest.version = version;
+          manifest.payload = provider;
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+
+          const marketplace = JSON.parse(fs.readFileSync(marketplacePath, 'utf8'));
+          const entry = marketplace.find(item => item.id === 'SeaUtils-Kolex06-Version');
+          if (!entry) throw new Error('SeaUtils marketplace entry not found');
+          entry.version = version;
+          fs.writeFileSync(marketplacePath, JSON.stringify(marketplace, null, 2) + '\n');
+
+          let readme = fs.readFileSync(readmePath, 'utf8');
+          readme = readme.replace(/(\| SeaUtils Kolex06-Version \| )[^|]+( \| `SeaUtils-Kolex06-Version` \|)/, `$1${version}$2`);
+          fs.writeFileSync(readmePath, readme);
+
+          fs.rmSync(workflowPath, { force: true });
+          NODE
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/SeaUtilsKolex06Version/provider.ts plugins/SeaUtils-Kolex06-Version.json marketplace.json README.md .github/workflows/seautils-hotfix-1-2-23.yml
+          git diff --cached --quiet || git commit -m "Fix SeaUtils docs button runtime"
+          git push
