@@ -17,74 +17,76 @@ jobs:
       - uses: actions/checkout@v4
       - name: Patch SeaUtils
         run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const version = '1.2.23';
-          const providerPath = 'plugins/SeaUtilsKolex06Version/provider.ts';
-          const manifestPath = 'plugins/SeaUtils-Kolex06-Version.json';
-          const marketplacePath = 'marketplace.json';
-          const readmePath = 'README.md';
+          python3 <<'PY'
+          import json
+          import re
+          from pathlib import Path
 
-          let provider = fs.readFileSync(providerPath, 'utf8').replace(/\r\n/g, '\n');
+          version = '1.2.23'
+          provider_path = Path('plugins/SeaUtilsKolex06Version/provider.ts')
+          manifest_path = Path('plugins/SeaUtils-Kolex06-Version.json')
+          marketplace_path = Path('marketplace.json')
+          readme_path = Path('README.md')
 
-          provider = provider.replace(/const marketplaceEnhancementVersion = 'v\d+';/, "const marketplaceEnhancementVersion = 'v10';");
+          provider = provider_path.read_text(encoding='utf-8').replace('\r\n', '\n')
+          provider = re.sub(r"const marketplaceEnhancementVersion = 'v\d+';", "const marketplaceEnhancementVersion = 'v10';", provider, count=1)
 
-          const oldPrefs = `                    async function hasPreferencesForCard(card) {
+          old_prefs = """                    async function hasPreferencesForCard(card) {
                         const extension = await findExtensionForCard(card);
                         return !!(extension && extension.userConfig);
-                    }`;
-          const newPrefs = `                    async function hasPreferencesForCard(card) {
+                    }"""
+          new_prefs = """                    async function hasPreferencesForCard(card) {
                         try {
                             const extension = await findExtensionForCard(card);
                             return !!(extension && extension.userConfig);
                         } catch (_) {
                             return false;
                         }
-                    }`;
-          if (provider.includes(oldPrefs)) provider = provider.replace(oldPrefs, newPrefs);
+                    }"""
+          provider = provider.replace(old_prefs, new_prefs, 1)
 
-          const oldDocs = `                    async function hasDocumentationForCard(card) {
+          old_docs = """                    async function hasDocumentationForCard(card) {
                         const extension = await findExtensionForCard(card);
                         return !!getExtensionDocumentationUrl(extension);
-                    }`;
-          const newDocs = `                    async function hasDocumentationForCard(card) {
+                    }"""
+          new_docs = """                    async function hasDocumentationForCard(card) {
                         try {
                             const extension = await findExtensionForCard(card);
                             return !!getExtensionDocumentationUrl(extension);
                         } catch (_) {
                             return false;
                         }
-                    }`;
-          if (provider.includes(oldDocs)) provider = provider.replace(oldDocs, newDocs);
+                    }"""
+          provider = provider.replace(old_docs, new_docs, 1)
 
-          if (!provider.includes("const marketplaceEnhancementVersion = 'v10';")) {
-            throw new Error('SeaUtils enhancement version was not updated');
-          }
-          if (!provider.includes('async function hasDocumentationForCard(card) {\n                        try {')) {
-            throw new Error('SeaUtils documentation check was not made fail-safe');
-          }
-          if (!provider.includes('async function hasPreferencesForCard(card) {\n                        try {')) {
-            throw new Error('SeaUtils preferences check was not made fail-safe');
-          }
+          if "const marketplaceEnhancementVersion = 'v10';" not in provider:
+              raise SystemExit('SeaUtils enhancement version was not updated')
+          if "async function hasDocumentationForCard(card) {\n                        try {" not in provider:
+              raise SystemExit('SeaUtils documentation check was not made fail-safe')
+          if "async function hasPreferencesForCard(card) {\n                        try {" not in provider:
+              raise SystemExit('SeaUtils preferences check was not made fail-safe')
 
-          provider = provider.replace(/\s+$/u, '');
-          fs.writeFileSync(providerPath, provider + '\n');
+          provider = provider.rstrip()
+          provider_path.write_text(provider + '\n', encoding='utf-8')
 
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          manifest.version = version;
-          manifest.payload = provider;
-          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['version'] = version
+          manifest['payload'] = provider
+          manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
-          const marketplace = JSON.parse(fs.readFileSync(marketplacePath, 'utf8'));
-          const entry = marketplace.find(item => item.id === 'SeaUtils-Kolex06-Version');
-          if (!entry) throw new Error('SeaUtils marketplace entry not found');
-          entry.version = version;
-          fs.writeFileSync(marketplacePath, JSON.stringify(marketplace, null, 2) + '\n');
+          marketplace = json.loads(marketplace_path.read_text(encoding='utf-8'))
+          for item in marketplace:
+              if item.get('id') == 'SeaUtils-Kolex06-Version':
+                  item['version'] = version
+                  break
+          else:
+              raise SystemExit('SeaUtils marketplace entry not found')
+          marketplace_path.write_text(json.dumps(marketplace, indent=2) + '\n', encoding='utf-8')
 
-          let readme = fs.readFileSync(readmePath, 'utf8');
-          readme = readme.replace(/(\| SeaUtils Kolex06-Version \| )[^|]+( \| `SeaUtils-Kolex06-Version` \|)/, `$1${version}$2`);
-          fs.writeFileSync(readmePath, readme);
-          NODE
+          readme = readme_path.read_text(encoding='utf-8')
+          readme = re.sub(r'(\| SeaUtils Kolex06-Version \| )[^|]+( \| `SeaUtils-Kolex06-Version` \|)', r'\g<1>' + version + r'\g<2>', readme, count=1)
+          readme_path.write_text(readme, encoding='utf-8')
+          PY
       - name: Commit patch
         run: |
           git config user.name "github-actions[bot]"
