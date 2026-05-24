@@ -1,0 +1,35 @@
+name: Add SeaUtils source file
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/add-seautils-source.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract SeaUtils provider source
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('plugins/SeaUtils-Kolex06-Version.json', 'utf8'));
+          fs.mkdirSync('plugins/SeaUtilsKolex06Version', { recursive: true });
+          fs.writeFileSync(
+            'plugins/SeaUtilsKolex06Version/provider.ts',
+            manifest.payload.endsWith('\n') ? manifest.payload : manifest.payload + '\n'
+          );
+          fs.rmSync('.github/workflows/add-seautils-source.yml', { force: true });
+          NODE
+      - name: Commit source file and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/SeaUtilsKolex06Version/provider.ts .github/workflows/add-seautils-source.yml
+          git commit -m "Add SeaUtils source file" || exit 0
+          git push
