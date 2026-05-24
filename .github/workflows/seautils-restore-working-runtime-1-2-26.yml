@@ -1,0 +1,29 @@
+name: SeaUtils restore working runtime 1.2.26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/seautils-restore-working-runtime-1-2-26.yml
+      - tools/seautils_restore_working_runtime_1_2_26.js
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore-seautils:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore SeaUtils working runtime
+        run: node tools/seautils_restore_working_runtime_1_2_26.js
+      - name: Commit restore
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/SeaUtilsKolex06Version/provider.ts plugins/SeaUtils-Kolex06-Version.json marketplace.json README.md
+          git diff --cached --quiet || git commit -m "Restore SeaUtils working runtime"
+          git push
