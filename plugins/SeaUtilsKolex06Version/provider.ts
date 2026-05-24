@@ -903,7 +903,7 @@ function init() {
 
                     let dubIdSetPromise = null;
                     const dragScrollEnhancementVersion = 'v4';
-                    const marketplaceEnhancementVersion = 'v9';
+                    const marketplaceEnhancementVersion = 'v10';
                     const catalogActionSources = new Map();
                     let allExtensionsPromise = null;
                     let extensionUpdatesPromise = null;
@@ -2278,8 +2278,12 @@ function init() {
                     }
 
                     async function hasPreferencesForCard(card) {
-                        const extension = await findExtensionForCard(card);
-                        return !!(extension && extension.userConfig);
+                        try {
+                            const extension = await findExtensionForCard(card);
+                            return !!(extension && extension.userConfig);
+                        } catch (_) {
+                            return false;
+                        }
                     }
 
                     function sourceCardHasNativePreferences(card) {
@@ -2557,8 +2561,12 @@ function init() {
                     }
 
                     async function hasDocumentationForCard(card) {
-                        const extension = await findExtensionForCard(card);
-                        return !!getExtensionDocumentationUrl(extension);
+                        try {
+                            const extension = await findExtensionForCard(card);
+                            return !!getExtensionDocumentationUrl(extension);
+                        } catch (_) {
+                            return false;
+                        }
                     }
 
                     async function showInstalledDocumentation(card) {
