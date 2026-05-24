@@ -83,7 +83,7 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/as
 
 ## Notes
 
-- Use `SeaUtils-Kolex06-Version.json` for SeaUtils Kolex06-Version. The provider contains the restored old working SeaUtils code directly.
+- Use `SeaUtils-Kolex06-Version.json` for SeaUtils Kolex06-Version. The provider restores the old working SeaUtils code from a pinned GitHub raw payload.
 - SeaAnime/Seanime only detects extension updates when the manifest version is higher than the installed version.
 - The marketplace file and plugin manifests should stay on matching versions.
 - Icons are hosted as raw PNG files from this repo.
