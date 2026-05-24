@@ -9,7 +9,7 @@ interface AmaSettings {
     subDubIcons: boolean
 }
 
-const LEGACY_SEAUTILS_MANIFEST_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtils.json"
+const LEGACY_SEAUTILS_MANIFEST_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/b9b9b0ddabcf3bd4d93cdee04e9155644707fe35/plugins/SeaUtils-Kolex06-Version.json"
 
 function init() {
     $ui.register(function(ctx) {
