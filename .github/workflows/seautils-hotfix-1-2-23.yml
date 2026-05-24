@@ -20,7 +20,6 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const version = '1.2.23';
-          const workflowPath = '.github/workflows/seautils-hotfix-1-2-23.yml';
           const providerPath = 'plugins/SeaUtilsKolex06Version/provider.ts';
           const manifestPath = 'plugins/SeaUtils-Kolex06-Version.json';
           const marketplacePath = 'marketplace.json';
@@ -85,13 +84,11 @@ jobs:
           let readme = fs.readFileSync(readmePath, 'utf8');
           readme = readme.replace(/(\| SeaUtils Kolex06-Version \| )[^|]+( \| `SeaUtils-Kolex06-Version` \|)/, `$1${version}$2`);
           fs.writeFileSync(readmePath, readme);
-
-          fs.rmSync(workflowPath, { force: true });
           NODE
       - name: Commit patch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add plugins/SeaUtilsKolex06Version/provider.ts plugins/SeaUtils-Kolex06-Version.json marketplace.json README.md .github/workflows/seautils-hotfix-1-2-23.yml
+          git add plugins/SeaUtilsKolex06Version/provider.ts plugins/SeaUtils-Kolex06-Version.json marketplace.json README.md
           git diff --cached --quiet || git commit -m "Fix SeaUtils docs button runtime"
           git push
