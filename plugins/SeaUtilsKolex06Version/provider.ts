@@ -189,7 +189,7 @@ function init() {
                 scroll-behavior: auto !important;
                 overscroll-behavior-x: contain !important;
                 -webkit-overflow-scrolling: touch !important;
-                touch-action: pan-y !important;
+                touch-action: pan-x pan-y !important;
                 contain: layout paint style !important;
             }
 
@@ -421,7 +421,7 @@ function init() {
                 scroll-behavior: auto !important;
                 overscroll-behavior-x: contain !important;
                 -webkit-overflow-scrolling: touch !important;
-                touch-action: pan-y !important;
+                touch-action: pan-x pan-y !important;
                 contain: layout paint style !important;
                 cursor: grab !important;
                 scrollbar-width: none !important;
@@ -551,11 +551,7 @@ function init() {
                 scroll-behavior: auto !important;
                 overscroll-behavior-x: contain !important;
                 -webkit-overflow-scrolling: touch !important;
-                touch-action: pan-y !important;
                 contain: layout paint style !important;
-                cursor: grab !important;
-                scrollbar-width: none !important;
-                -ms-overflow-style: none !important;
             }
 
             body[data-ama-better-marketplace="true"] .ama-catalog-card-wrap {
@@ -906,8 +902,8 @@ function init() {
                     const SETTINGS_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>';
 
                     let dubIdSetPromise = null;
-                    const dragScrollEnhancementVersion = 'v5';
-                    const marketplaceEnhancementVersion = 'v10';
+                    const dragScrollEnhancementVersion = 'v4';
+                    const marketplaceEnhancementVersion = 'v8';
                     const catalogActionSources = new Map();
                     let allExtensionsPromise = null;
                     let extensionUpdatesPromise = null;
@@ -1220,8 +1216,6 @@ function init() {
                         let suppressClick = false;
                         let startX = 0;
                         let startScrollLeft = 0;
-                        let activePointerId = null;
-                        let lastPointerDownAt = 0;
 
                         function isRealControl(target) {
                             return !!(
@@ -1237,38 +1231,42 @@ function init() {
                                 : !!featureSettings.carousels;
                         }
 
-                        function getClientX(event) {
-                            if (event && typeof event.clientX === 'number') return event.clientX;
-                            if (event && event.touches && event.touches[0]) return event.touches[0].clientX;
-                            if (event && event.changedTouches && event.changedTouches[0]) return event.changedTouches[0].clientX;
-                            return startX;
+                        function stopDrag(pointerId) {
+                            isDown = false;
+                            el.classList.remove('ama-drag-pending');
+                            el.classList.remove('ama-dragging');
+
+                            setTimeout(() => {
+                                suppressClick = false;
+                                didDrag = false;
+                            }, 350);
+
+                            try {
+                                if (pointerId !== undefined) el.releasePointerCapture(pointerId);
+                            } catch (_) {}
                         }
 
-                        function shouldIgnoreButton(event) {
-                            return event && typeof event.button === 'number' && event.button !== 0;
-                        }
-
-                        function beginDrag(event, pointerId) {
-                            if (!isEnabled()) return false;
-                            if (isRealControl(event.target)) return false;
-                            if (shouldIgnoreButton(event)) return false;
+                        el.addEventListener('pointerdown', event => {
+                            if (!isEnabled()) return;
+                            if (isRealControl(event.target)) return;
+                            if (event.button !== 0) return;
 
                             isDown = true;
                             didDrag = false;
                             suppressClick = false;
-                            activePointerId = pointerId === undefined ? null : pointerId;
-                            startX = getClientX(event);
+                            startX = event.clientX;
                             startScrollLeft = el.scrollLeft;
                             el.classList.add('ama-drag-pending');
 
-                            return true;
-                        }
+                            try {
+                                el.setPointerCapture(event.pointerId);
+                            } catch (_) {}
+                        }, true);
 
-                        function moveDrag(event) {
+                        el.addEventListener('pointermove', event => {
                             if (!isDown) return;
-                            if (activePointerId !== null && event.pointerId !== undefined && event.pointerId !== activePointerId) return;
 
-                            const dx = getClientX(event) - startX;
+                            const dx = event.clientX - startX;
 
                             if (Math.abs(dx) > 4) {
                                 didDrag = true;
@@ -1288,35 +1286,6 @@ function init() {
                                 event.preventDefault();
                                 event.stopPropagation();
                             }
-                        }
-
-                        function stopDrag(pointerId) {
-                            isDown = false;
-                            activePointerId = null;
-                            el.classList.remove('ama-drag-pending');
-                            el.classList.remove('ama-dragging');
-
-                            setTimeout(() => {
-                                suppressClick = false;
-                                didDrag = false;
-                            }, 350);
-
-                            try {
-                                if (pointerId !== undefined) el.releasePointerCapture(pointerId);
-                            } catch (_) {}
-                        }
-
-                        el.addEventListener('pointerdown', event => {
-                            if (!beginDrag(event, event.pointerId)) return;
-                            lastPointerDownAt = Date.now();
-
-                            try {
-                                el.setPointerCapture(event.pointerId);
-                            } catch (_) {}
-                        }, true);
-
-                        el.addEventListener('pointermove', event => {
-                            moveDrag(event);
                         }, true);
 
                         el.addEventListener('pointerup', event => {
@@ -1325,30 +1294,6 @@ function init() {
 
                         el.addEventListener('pointercancel', event => {
                             stopDrag(event.pointerId);
-                        });
-
-                        function onMouseMove(event) {
-                            moveDrag(event);
-                        }
-
-                        function onMouseUp() {
-                            stopDrag();
-                            document.removeEventListener('mousemove', onMouseMove, true);
-                            document.removeEventListener('mouseup', onMouseUp, true);
-                        }
-
-                        el.addEventListener('mousedown', event => {
-                            if (Date.now() - lastPointerDownAt < 500) return;
-                            if (!beginDrag(event)) return;
-
-                            document.addEventListener('mousemove', onMouseMove, true);
-                            document.addEventListener('mouseup', onMouseUp, true);
-                        }, true);
-
-                        window.addEventListener('blur', () => {
-                            stopDrag();
-                            document.removeEventListener('mousemove', onMouseMove, true);
-                            document.removeEventListener('mouseup', onMouseUp, true);
                         });
 
                         el.addEventListener('click', event => {
@@ -2333,12 +2278,8 @@ function init() {
                     }
 
                     async function hasPreferencesForCard(card) {
-                        try {
-                            const extension = await findExtensionForCard(card);
-                            return !!(extension && extension.userConfig);
-                        } catch (_) {
-                            return false;
-                        }
+                        const extension = await findExtensionForCard(card);
+                        return !!(extension && extension.userConfig);
                     }
 
                     function sourceCardHasNativePreferences(card) {
@@ -2616,12 +2557,8 @@ function init() {
                     }
 
                     async function hasDocumentationForCard(card) {
-                        try {
-                            const extension = await findExtensionForCard(card);
-                            return !!getExtensionDocumentationUrl(extension);
-                        } catch (_) {
-                            return false;
-                        }
+                        const extension = await findExtensionForCard(card);
+                        return !!getExtensionDocumentationUrl(extension);
                     }
 
                     async function showInstalledDocumentation(card) {
@@ -2869,12 +2806,7 @@ function init() {
                             addCloneAction(actions, 'Info', MORE_ICON, 'more', sourceId);
                             addCloneAction(actions, 'Code', CODE_ICON, 'code', sourceId);
 
-                            hasDocumentationForCard(sourceCard).then(hasDocumentation => {
-                                if (!hasDocumentation) return;
-                                if (!actions.isConnected) return;
-
-                                addCloneAction(actions, 'Documentation', DOCUMENTATION_ICON, 'documentation', sourceId);
-                            });
+                            addCloneAction(actions, 'Documentation', DOCUMENTATION_ICON, 'documentation', sourceId);
 
                             if (isKolex06VersionExtension(data) || sourceCardHasNativePreferences(sourceCard)) {
                                 addCloneAction(actions, 'Preferences', SETTINGS_ICON, 'preferences', sourceId);
