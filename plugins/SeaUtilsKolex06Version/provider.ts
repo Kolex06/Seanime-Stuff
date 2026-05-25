@@ -9,12 +9,11 @@ interface AmaSettings {
     subDubIcons: boolean
 }
 
-const LEGACY_SEAUTILS_MANIFEST_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/b9b9b0ddabcf3bd4d93cdee04e9155644707fe35/plugins/SeaUtils-Kolex06-Version.json"
-const SEAUTILS_TRAY_ICON_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/SeaUtils-Kolex06-Version.png"
-
 function init() {
     $ui.register(function(ctx) {
 
+        const LEGACY_SEAUTILS_MANIFEST_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/b9b9b0ddabcf3bd4d93cdee04e9155644707fe35/plugins/SeaUtils-Kolex06-Version.json"
+        const SEAUTILS_TRAY_ICON_URL = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/SeaUtils-Kolex06-Version.png"
         const SETTINGS_KEY = "ama-ui-tweaks.settings"
 
         const DEFAULT_SETTINGS: AmaSettings = {
