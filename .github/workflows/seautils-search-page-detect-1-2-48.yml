@@ -62,3 +62,4 @@ jobs:
           git add plugins/SeaUtils-Kolex06-Version.json marketplace.json README.md .github/workflows/seautils-search-page-detect-1-2-48.yml
           git commit -m "Fix SeaUtils search carousel page detection"
           git push
+# trigger: 2
