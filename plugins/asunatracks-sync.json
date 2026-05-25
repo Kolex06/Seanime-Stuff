@@ -1,7 +1,7 @@
 {
   "id": "asunatracks-sync",
   "name": "AsunaTracks Sync",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/asunatracks-sync.json",
   "language": "typescript",
   "type": "plugin",
