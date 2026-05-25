@@ -1,4 +1,4 @@
-name: SeaUtils Search Page Detect 1.2.50
+name: SeaUtils Search Page Detect 1.2.51
 
 on:
   push:
@@ -25,15 +25,7 @@ jobs:
           const workflowPath = '.github/workflows/seautils-search-page-detect-1-2-50.yml';
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
           let payload = manifest.payload;
-          const oldSearch = `function hasSearchPageSignal() {
-                        const path = String(window.location.pathname || '').toLowerCase();
-                        const hash = String(window.location.hash || '').toLowerCase();
-                        const combined = path + ' ' + hash;
-
-                        if (/(^|[\\/#?&=-])search($|[\\/#?&=-])/.test(combined)) return true;
-                        return false;
-                    }`;
-          const newSearch = `function hasSearchPageSignal() {
+          const searchBlock = `function hasSearchPageSignal() {
                         const path = String(window.location.pathname || '').toLowerCase();
                         const search = String(window.location.search || '').toLowerCase();
                         const hash = String(window.location.hash || '').toLowerCase();
@@ -45,31 +37,23 @@ jobs:
                         if (document.querySelector('input[placeholder*="Search anime"], input[placeholder*="Search Anime"], input[placeholder*="Search manga"], input[placeholder*="Search Manga"], input[placeholder*="Search media"], input[placeholder*="Search Media"], input[placeholder*="Search for anime"], input[placeholder*="Search for Anime"], input[placeholder*="Search for manga"], input[placeholder*="Search for Manga"]')) return true;
 
                         return false;
-                    }`;
-          if (!payload.includes(newSearch)) {
-            if (!payload.includes(oldSearch)) throw new Error('Search detector block not found');
-            payload = payload.replace(oldSearch, newSearch);
-          }
-          const oldProcess = `function processRoot(root) {
-                        if (!root) return;
+                    }
 
-                        if (!featureSettings.betterMarketplace) {`;
-          const newProcess = `function processRoot(root) {
+                    function getCarouselPageKey() {`;
+          payload = payload.replace(/function hasSearchPageSignal\(\) \{[\s\S]*?\n\s*function getCarouselPageKey\(\) \{/, searchBlock);
+          const processBlock = `function processRoot(root) {
                         if (!root) return;
 
                         setBodyFlags();
 
                         if (!featureSettings.betterMarketplace) {`;
-          if (!payload.includes(newProcess)) {
-            if (!payload.includes(oldProcess)) throw new Error('processRoot block not found');
-            payload = payload.replace(oldProcess, newProcess);
-          }
-          manifest.version = '1.2.50';
+          payload = payload.replace(/function processRoot\(root\) \{\n\s*if \(!root\) return;\n\n\s*(?:setBodyFlags\(\);\n\n\s*)?if \(!featureSettings\.betterMarketplace\) \{/, processBlock);
+          manifest.version = '1.2.51';
           manifest.payload = payload;
           fs.writeFileSync(manifestPath, JSON.stringify(manifest), 'utf8');
           const marketplace = JSON.parse(fs.readFileSync(marketplacePath, 'utf8'));
           for (const item of marketplace) {
-            if (item.id === 'SeaUtils-Kolex06-Version') item.version = '1.2.50';
+            if (item.id === 'SeaUtils-Kolex06-Version') item.version = '1.2.51';
           }
           fs.writeFileSync(marketplacePath, JSON.stringify(marketplace, null, 2) + '\n', 'utf8');
           fs.rmSync(workflowPath, { force: true });
