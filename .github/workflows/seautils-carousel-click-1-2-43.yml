@@ -1,0 +1,28 @@
+name: SeaUtils Carousel Click 1.2.43
+
+on:
+  push:
+    paths:
+      - ".github/workflows/seautils-carousel-click-1-2-43.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Apply fix
+        run: node tools/fix-seautils-carousel-click-1-2-43.js
+      - name: Commit fix and cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/SeaUtils-Kolex06-Version.json marketplace.json README.md tools/fix-seautils-carousel-click-1-2-43.js .github/workflows/seautils-carousel-click-1-2-43.yml
+          git commit -m "Fix SeaUtils carousel card clicks"
+          git push
