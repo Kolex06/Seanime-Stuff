@@ -199,8 +199,8 @@ function init() {
                 height: 0 !important;
             }
 
-            body[data-ama-better-marketplace="true"] input[placeholder*="Search"]:not(.ama-search-input),
-            body[data-ama-better-marketplace="true"] input[placeholder*="search"]:not(.ama-search-input) {
+            body[data-ama-better-marketplace="true"][data-ama-better-marketplace-page="true"] input[placeholder*="Search"]:not(.ama-search-input),
+            body[data-ama-better-marketplace="true"][data-ama-better-marketplace-page="true"] input[placeholder*="search"]:not(.ama-search-input) {
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.45)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") !important;
                 background-repeat: no-repeat !important;
                 background-position: 10px center !important;
@@ -1103,6 +1103,7 @@ function init() {
                         if (!document.body) return;
 
                         document.body.setAttribute('data-ama-better-marketplace', String(!!featureSettings.betterMarketplace));
+                        document.body.setAttribute('data-ama-better-marketplace-page', String(isBetterMarketplacePage()));
                         document.body.setAttribute('data-ama-carousels', String(!!featureSettings.carousels));
                         document.body.setAttribute('data-ama-carousel-page', getCarouselPageKey());
                         document.body.setAttribute('data-ama-carousels-active', String(areCarouselsEnabledForCurrentPage()));
@@ -1737,6 +1738,21 @@ function init() {
                         if (root.querySelectorAll) {
                             root.querySelectorAll('.ama-modal').forEach(modal => modal.remove());
                         }
+                    }
+
+                    function hasMarketplaceExtensionCards(root) {
+                        return !!(root && root.querySelector && root.querySelector('.group\\\\/extension-card'));
+                    }
+
+                    function isMarketplaceSectionCard(card) {
+                        if (!card || !card.querySelector) return false;
+
+                        const grid = card.querySelector('.ama-extension-carousel, .grid');
+                        return hasMarketplaceExtensionCards(grid || card);
+                    }
+
+                    function isBetterMarketplacePage() {
+                        return hasMarketplaceExtensionCards(document);
                     }
 
                     function getExtensionCardData(card) {
@@ -2895,6 +2911,8 @@ function init() {
 
                     function getMarketplaceSections() {
                         return Array.from(document.querySelectorAll(cardQuery)).map(card => {
+                            if (!isMarketplaceSectionCard(card)) return null;
+
                             const titleEl = card.querySelector('.ama-header-left h3, h3');
                             const grid = card.querySelector('.ama-extension-carousel, .grid');
 
@@ -3033,6 +3051,11 @@ function init() {
                         const existing = document.querySelector('.ama-global-catalog-bar');
                         const sections = getMarketplaceSections();
                         if (existing) {
+                            if (!sections.length) {
+                                existing.remove();
+                                return;
+                            }
+
                             existing.querySelector('.ama-global-catalog-btn').onclick = () => openFullCatalogModal(getAuthorFullCatalogSections(), 'Full Catalog');
                             return;
                         }
@@ -3058,11 +3081,19 @@ function init() {
                         if (!featureSettings.betterMarketplace) return;
                         if (!card) return;
 
-                        markMarketplaceExtensionCards(card);
+                        if (!isMarketplaceSectionCard(card)) {
+                            if (card.dataset.amaEnhanced || card.querySelector(':scope > .ama-header-container')) {
+                                cleanupBetterMarketplace(card);
+                            }
+
+                            return;
+                        }
 
                         if (card.dataset.amaEnhanced && card.dataset.amaEnhanced !== marketplaceEnhancementVersion) {
                             cleanupBetterMarketplace(card);
                         }
+
+                        markMarketplaceExtensionCards(card);
 
                         if (card.dataset.amaEnhanced === marketplaceEnhancementVersion) {
                             const enhancedGrid = card.querySelector('.grid');

@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.65
+- Limited Better Marketplace enhancements to real extension marketplace sections.
+- Prevented View All/search controls from appearing in Settings cards such as Video Playback.
+
 ### 1.2.64
 - Kept the blue outline/glow for extensions with an available update.
 - Clears the update glow after the extension is switched to the newest version.
