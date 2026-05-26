@@ -29,6 +29,43 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 - Private AniList entries are skipped during sync.
 - You can disable live sync from the tray at any time without signing out.
 
+## Version History
+
+### 0.1.18
+
+- Centered the tray action buttons so the log, account check, anime sync, and manga sync buttons line up cleanly.
+- Updated the marketplace and extension manifest version.
+
+### 0.1.17
+
+- Fixed the password field so the password is hidden without showing an extra masked `*` above the input.
+- Kept the visible password title as `Password` and left the internal input label blank.
+- Updated the installed Seanime cache and GitHub release files.
+
+### 0.1.16
+
+- Added the AsunaTracks logo to the extension manifest so it shows in Seanime's extension install/details screens.
+- Improved the login/settings popup styling to better match AsunaTracks.
+- Added clearer description and additional notes for Seanime users.
+
+### 0.1.15
+
+- Added per-notification `Delete` and `Read` actions.
+- Added `Mark all as Read` and `Delete all` actions to the notifications popup.
+- Switched the notification badge text button to a bell icon.
+
+### 0.1.14
+
+- Added the profile avatar menu with `Open in browser` and `Sign out`.
+- Fixed profile links to use `/u/{username}`.
+- Removed the extra gear/settings button from the main tray header.
+
+### 0.1.13
+
+- Moved the extension into `Kolex06/Seanime-Stuff` for easier Seanime installation.
+- Added marketplace and manifest entries for installing from GitHub.
+- Added the initial AsunaTracks sync tray UI, live sync hooks, manual anime/manga sync buttons, logs, notifications, and live-sync toggles.
+
 ## Local AsunaTracks Testing
 
 The extension defaults to:
