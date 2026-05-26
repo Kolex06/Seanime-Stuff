@@ -35,6 +35,11 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.57
+
+- Added a page-level Full Catalog button under the Extensions search area.
+- The combined Full Catalog popup now shows Plugins, Anime torrents, Manga, and Online streaming sections together.
+
 ### 1.2.56
 
 - Fixed Documentation so it appears in View All / Full Catalog for known documented extensions.
