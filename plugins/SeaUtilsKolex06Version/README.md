@@ -35,6 +35,15 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.61
+- Fixed the escaped extension-card selectors that stopped View All from appearing on the Extensions page.
+- Restored drag setup for Extensions page marketplace rows after the combined Full Catalog changes.
+
+### 1.2.60
+
+- Fixed escaped extension-card selectors used by Full Catalog and marketplace update highlighting.
+- Forced a fresh marketplace rebuild and drag rebind so View All and extension-page drag return after updating.
+
 ### 1.2.59
 
 - Fixed the page-level Full Catalog button so it still appears after marketplace section headers are moved into SeaUtils headers.
