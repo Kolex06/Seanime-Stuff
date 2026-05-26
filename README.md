@@ -102,24 +102,6 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/as
 - The marketplace file and plugin manifests should stay on matching versions.
 - Icons are hosted as raw PNG files from this repo.
 
-## Recent SeaUtils Changes
-
-### 1.2.64
-
-- Keeps the blue outline/glow only while an extension has an update available.
-- Clears the update glow after the extension is switched to the newest version.
-
-### 1.2.63
-
-- Moved SeaUtils code into `plugins/SeaUtilsKolex06Version/provider.ts`.
-- Switched the SeaUtils manifest to `payloadURI`.
-- Reformatted the SeaUtils manifest and marketplace JSON for easier reading.
-
-### 1.2.62
-
-- Changed the combined Full Catalog popup to group all marketplace sections by author.
-- Kept per-section View All buttons focused on their own section.
-
 ## Repository Layout
 
 ```text
