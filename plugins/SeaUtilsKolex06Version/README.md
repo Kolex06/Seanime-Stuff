@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.62
+- Changed the combined Full Catalog popup to group all marketplace sections by author.
+- Kept the per-section View All buttons focused on their own section.
+
 ### 1.2.61
 - Fixed the escaped extension-card selectors that stopped View All from appearing on the Extensions page.
 - Restored drag setup for Extensions page marketplace rows after the combined Full Catalog changes.
