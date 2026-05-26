@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.63
+- Moved the SeaUtils plugin code into `provider.ts` and switched the manifest to `payloadURI`.
+- Reformatted the SeaUtils manifest and marketplace JSON for easier reading.
+
 ### 1.2.62
 - Changed the combined Full Catalog popup to group all marketplace sections by author.
 - Kept the per-section View All buttons focused on their own section.
