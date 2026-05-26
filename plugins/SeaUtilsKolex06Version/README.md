@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.66
+- Added marketplace-version versus installed-version detection for update glow.
+- Improved update detection for cards that do not show an old-to-new version arrow.
+
 ### 1.2.65
 - Limited Better Marketplace enhancements to real extension marketplace sections.
 - Prevented View All/search controls from appearing in Settings cards such as Video Playback.

@@ -1794,10 +1794,43 @@ function init() {
                             if (value) parts.push(value);
                         });
 
+                        card.querySelectorAll('button, [aria-label], [title]').forEach(node => {
+                            const text = node.textContent && node.textContent.trim();
+                            const aria = node.getAttribute && node.getAttribute('aria-label');
+                            const title = node.getAttribute && node.getAttribute('title');
+
+                            if (text) parts.push(text);
+                            if (aria) parts.push(aria);
+                            if (title) parts.push(title);
+                        });
+
                         const fullText = card.innerText || card.textContent || '';
                         if (fullText) parts.push(fullText);
 
                         return parts.join(' | ');
+                    }
+
+                    function normalizeVersionText(value) {
+                        const match = String(value || '').match(/\d+(?:\.\d+){1,3}/);
+                        return match ? match[0] : '';
+                    }
+
+                    function compareVersionText(a, b) {
+                        const left = normalizeVersionText(a);
+                        const right = normalizeVersionText(b);
+
+                        if (!left || !right) return 0;
+
+                        const leftParts = left.split('.').map(part => parseInt(part, 10) || 0);
+                        const rightParts = right.split('.').map(part => parseInt(part, 10) || 0);
+                        const length = Math.max(leftParts.length, rightParts.length);
+
+                        for (let i = 0; i < length; i += 1) {
+                            const diff = (leftParts[i] || 0) - (rightParts[i] || 0);
+                            if (diff !== 0) return diff > 0 ? 1 : -1;
+                        }
+
+                        return 0;
                     }
 
                     function applyExtensionUpdateStyle(card, hasUpdate) {
@@ -1821,6 +1854,7 @@ function init() {
                     function markExtensionUpdateState(card) {
                         if (!card || !card.querySelectorAll) return false;
 
+                        const data = getExtensionCardData(card);
                         const hasUpdate = hasExtensionUpdateText(getExtensionUpdateText(card));
                         const value = hasUpdate ? 'true' : 'false';
 
@@ -1829,6 +1863,28 @@ function init() {
                         const wrapper = card.closest('.ama-catalog-card-wrap');
                         if (wrapper) {
                             wrapper.dataset.amaUpdateAvailable = value;
+                        }
+
+                        if (!hasUpdate && data.version) {
+                            findExtensionForCard(card).then(extension => {
+                                if (!card.isConnected) return;
+
+                                const installedVersion = extension && extension.version;
+                                const marketplaceVersion = data.version;
+                                const hasVersionUpdate = compareVersionText(marketplaceVersion, installedVersion) > 0;
+                                const nextValue = hasVersionUpdate ? 'true' : 'false';
+
+                                applyExtensionUpdateStyle(card, hasVersionUpdate);
+
+                                const nextWrapper = card.closest('.ama-catalog-card-wrap');
+                                if (nextWrapper) {
+                                    if (hasVersionUpdate) {
+                                        nextWrapper.dataset.amaUpdateAvailable = 'true';
+                                    } else {
+                                        delete nextWrapper.dataset.amaUpdateAvailable;
+                                    }
+                                }
+                            }).catch(() => {});
                         }
 
                         return hasUpdate;
