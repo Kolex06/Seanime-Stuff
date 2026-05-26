@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.64
+- Kept the blue outline/glow for extensions with an available update.
+- Clears the update glow after the extension is switched to the newest version.
+
 ### 1.2.63
 - Moved the SeaUtils plugin code into `provider.ts` and switched the manifest to `payloadURI`.
 - Reformatted the SeaUtils manifest and marketplace JSON for easier reading.

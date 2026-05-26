@@ -527,7 +527,6 @@ function init() {
                 background: rgba(255, 255, 255, 0.08) !important;
             }
 
-            
             body[data-ama-better-marketplace="true"] .group\/extension-card[data-ama-update-available="true"],
             body[data-ama-better-marketplace="true"] .ama-catalog-card-wrap[data-ama-update-available="true"] > .group\/extension-card,
             body[data-ama-better-marketplace="true"] .UI-Card__root[data-ama-update-available="true"] {
@@ -1786,22 +1785,20 @@ function init() {
                     }
 
                     function applyExtensionUpdateStyle(card, hasUpdate) {
-                        if (!card || !card.style) return;
+                        if (!card) return;
 
                         if (hasUpdate) {
                             card.dataset.amaUpdateAvailable = 'true';
-                            card.style.setProperty('border-color', 'rgba(56, 189, 248, 0.95)', 'important');
-                            card.style.setProperty('outline', '1px solid rgba(56, 189, 248, 0.85)', 'important');
-                            card.style.setProperty('outline-offset', '0', 'important');
-                            card.style.setProperty('box-shadow', '0 0 0 1px rgba(56, 189, 248, 0.75), 0 0 18px rgba(56, 189, 248, 0.24)', 'important');
-                            card.style.setProperty('background', 'rgba(14, 165, 233, 0.12)', 'important');
                         } else {
-                            card.dataset.amaUpdateAvailable = 'false';
-                            card.style.removeProperty('border-color');
-                            card.style.removeProperty('outline');
-                            card.style.removeProperty('outline-offset');
-                            card.style.removeProperty('box-shadow');
-                            card.style.removeProperty('background');
+                            delete card.dataset.amaUpdateAvailable;
+
+                            if (card.style) {
+                                card.style.removeProperty('border-color');
+                                card.style.removeProperty('outline');
+                                card.style.removeProperty('outline-offset');
+                                card.style.removeProperty('box-shadow');
+                                card.style.removeProperty('background');
+                            }
                         }
                     }
 
