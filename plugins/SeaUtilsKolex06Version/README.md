@@ -35,6 +35,11 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.56
+
+- Fixed Documentation so it appears in View All / Full Catalog for known documented extensions.
+- Made Documentation insertion deterministic during Full Catalog popup creation.
+
 ### 1.2.54
 
 - Fixed update highlighting so the whole extension card gets the blue outline/glow when an update is available.
