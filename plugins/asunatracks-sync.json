@@ -16,10 +16,19 @@
   "plugin": {
     "version": "1",
     "permissions": {
-      "scopes": ["storage", "anilist", "database", "anilist-token"],
+      "scopes": [
+        "storage",
+        "anilist",
+        "database",
+        "anilist-token"
+      ],
       "allow": {
         "networkAccess": {
-          "allowedDomains": ["asunatracks.space", "localhost", "127.0.0.1"],
+          "allowedDomains": [
+            "asunatracks.space",
+            "localhost",
+            "127.0.0.1"
+          ],
           "reasoning": "Required to authenticate with AsunaTracks and sync the current user's anime and manga list through the public API."
         }
       }

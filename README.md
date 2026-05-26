@@ -19,7 +19,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 | Extension | Version | ID | Description |
 | --- | --- | --- | --- |
 | SeaUtils Kolex06-Version | 1.2.64 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
-| AsunaTracks Sync | 0.1.13 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
+| AsunaTracks Sync | 0.1.18 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
 
