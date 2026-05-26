@@ -31,6 +31,12 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.19
+
+- Added a dedicated `Missing MAL IDs` side panel in the notifications popup.
+- Entries skipped because AniList has no MAL ID are now saved there with title, media type, reason, timestamp, and cover image when available.
+- Added delete controls for individual missing-MAL entries and a clear button for the full list.
+
 ### 0.1.18
 
 - Centered the tray action buttons so the log, account check, anime sync, and manga sync buttons line up cleanly.
