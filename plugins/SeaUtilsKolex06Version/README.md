@@ -35,6 +35,11 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.58
+
+- Fixed update highlighting so every extension card in the marketplace carousel is marked directly.
+- Added an inline blue outline/glow fallback for update cards when Seanime CSS overrides the injected stylesheet.
+
 ### 1.2.57
 
 - Added a page-level Full Catalog button under the Extensions search area.
