@@ -35,6 +35,11 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.59
+
+- Fixed the page-level Full Catalog button so it still appears after marketplace section headers are moved into SeaUtils headers.
+- Restored marketplace carousel drag binding by forcing a new drag enhancement version.
+
 ### 1.2.58
 
 - Fixed update highlighting so every extension card in the marketplace carousel is marked directly.
