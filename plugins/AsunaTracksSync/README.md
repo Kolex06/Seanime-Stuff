@@ -31,6 +31,12 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.20
+
+- Updated sync payloads to use the newer AsunaTracks public API fields.
+- Added `score_10` for preferred 0-10 ratings while keeping the older score fallback.
+- Added manga `progress_volumes` sync when Seanime/AniList provides volume progress.
+
 ### 0.1.19
 
 - Added a dedicated `Missing MAL IDs` side panel in the notifications popup.
@@ -81,3 +87,4 @@ https://asunatracks.space
 ```
 
 Open the profile menu, choose `Settings`, and change the URL to `http://localhost:8000` if you are testing a local AsunaTracks server.
+
