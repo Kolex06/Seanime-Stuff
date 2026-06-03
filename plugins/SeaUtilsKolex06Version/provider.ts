@@ -782,43 +782,6 @@ function init() {
                 background: rgba(255,255,255,0.14) !important;
             }
 
-            body[data-ama-better-marketplace="true"] .group\/extension-card[data-ama-permission-required="true"] {
-                position: relative !important;
-                padding-right: 92px !important;
-            }
-
-            body[data-ama-better-marketplace="true"] .ama-native-permission-actions {
-                position: absolute !important;
-                top: 12px !important;
-                right: 12px !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: flex-end !important;
-                gap: 6px !important;
-                z-index: 50 !important;
-                max-width: 82px !important;
-            }
-
-            body[data-ama-better-marketplace="true"] .ama-native-permission-action {
-                width: 34px !important;
-                height: 34px !important;
-                min-width: 34px !important;
-                padding: 0 !important;
-                border-radius: 10px !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                overflow: hidden !important;
-                white-space: nowrap !important;
-                line-height: 1 !important;
-            }
-
-            body[data-ama-better-marketplace="true"] .ama-native-permission-action svg {
-                width: 18px !important;
-                height: 18px !important;
-                flex: 0 0 auto !important;
-            }
-
             body[data-ama-better-marketplace="true"] .ama-code-preview {
                 margin: 16px 0 0 0 !important;
                 padding: 16px !important;
@@ -1067,7 +1030,6 @@ function init() {
                     const CODE_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"></path><path d="m8 6-6 6 6 6"></path></svg>';
                     const DOC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"></path></svg>';
                     const SETTINGS_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>';
-                    const GRANT_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.2 1.2 0 0 1 1.52 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>';
 
                     let dubIdSetPromise = null;
                     const dragScrollEnhancementVersion = 'v8';
@@ -1798,12 +1760,9 @@ function init() {
                         const badges = Array.from(card.querySelectorAll('.UI-Badge__root')).map(badge => badge.textContent.trim()).filter(Boolean);
                         const idEl = card.querySelector('.text-xs .opacity-30, [data-extension-id], [data-extension-card-id]');
                         const titleEl = card.querySelector('.font-semibold');
-                        const manifestLinkPattern = new RegExp('plugins/[^/?#]+[.]json', 'i');
-                        const manifestLink = Array.from(card.querySelectorAll('a[href]')).map(link => link.getAttribute('href') || '').find(href => manifestLinkPattern.test(href)) || '';
-                        const manifestId = getExtensionIdFromManifestUri(manifestLink);
 
                         return {
-                            id: (idEl && idEl.textContent.trim()) || manifestId || getKnownExtensionIdFromText(card.innerText || card.textContent || ''),
+                            id: (idEl && idEl.textContent.trim()) || '',
                             name: (titleEl && titleEl.textContent.trim()) || paragraphs[0] || 'Extension',
                             description: paragraphs[2] || paragraphs[1] || '',
                             version: badges[0] || '',
@@ -1874,45 +1833,11 @@ function init() {
                         return 0;
                     }
 
-                    function getExtensionIdFromManifestUri(value) {
-                        const text = String(value || '');
-                        const match = text.match(new RegExp('plugins/([^/?#]+)[.]json', 'i'));
-                        if (!match) return '';
-
-                        const file = match[1].toLowerCase();
-                        if (file === 'seautils-kolex06-version') return 'SeaUtils-Kolex06-Version';
-                        if (file === 'asunatracks-sync') return 'asunatracks-sync';
-
-                        return match[1];
-                    }
-
-                    function getKnownExtensionIdFromText(value) {
-                        const text = normalizeExtensionText(value);
-
-                        if (text.includes('asunatracks sync') || text.includes('asunatracks-sync')) {
-                            return 'asunatracks-sync';
-                        }
-
-                        if (text.includes('seautils kolex06-version') || text.includes('seautils-kolex06-version')) {
-                            return 'SeaUtils-Kolex06-Version';
-                        }
-
-                        return '';
-                    }
-
                     function applyExtensionUpdateStyle(card, hasUpdate) {
                         if (!card) return;
 
                         if (hasUpdate) {
                             card.dataset.amaUpdateAvailable = 'true';
-
-                            if (card.style) {
-                                card.style.setProperty('border-color', 'rgba(56, 189, 248, 0.95)', 'important');
-                                card.style.setProperty('outline', '1px solid rgba(56, 189, 248, 0.85)', 'important');
-                                card.style.setProperty('outline-offset', '0', 'important');
-                                card.style.setProperty('box-shadow', '0 0 0 1px rgba(56, 189, 248, 0.75), 0 0 18px rgba(56, 189, 248, 0.24)', 'important');
-                                card.style.setProperty('background', 'rgba(14, 165, 233, 0.12)', 'important');
-                            }
                         } else {
                             delete card.dataset.amaUpdateAvailable;
 
@@ -1977,63 +1902,6 @@ function init() {
                         root.querySelectorAll('.group\\\\/extension-card').forEach(card => cards.push(card));
 
                         cards.forEach(card => markExtensionUpdateState(card));
-                    }
-
-                    function enhancePermissionRequiredControls(root) {
-                        if (!root || !root.querySelectorAll) return;
-
-                        const cards = [];
-
-                        if (root.matches && root.matches('.group\\\\/extension-card')) {
-                            cards.push(root);
-                        }
-
-                        root.querySelectorAll('.group\\\\/extension-card').forEach(card => cards.push(card));
-
-                        cards.forEach(card => {
-                            const buttons = Array.from(card.querySelectorAll('button'));
-                            const grantButtons = buttons.filter(button => {
-                                const text = String(button.textContent || '').trim();
-                                const aria = button.getAttribute('aria-label') || '';
-                                const title = button.getAttribute('title') || '';
-
-                                return /\bgrant\b/i.test([text, aria, title].join(' '));
-                            });
-
-                            if (!grantButtons.length) {
-                                delete card.dataset.amaPermissionRequired;
-                                return;
-                            }
-
-                            card.dataset.amaPermissionRequired = 'true';
-
-                            grantButtons.forEach(button => {
-                                button.classList.add('ama-native-permission-action');
-                                button.dataset.amaPermissionAction = 'grant';
-                                button.title = 'Grant permissions';
-                                button.setAttribute('aria-label', 'Grant permissions');
-
-                                if (button.dataset.amaGrantIconApplied !== 'true') {
-                                    button.dataset.amaGrantIconApplied = 'true';
-                                    button.innerHTML = GRANT_ICON;
-                                }
-                            });
-
-                            const actionParent = grantButtons[0].parentElement;
-                            if (!actionParent) return;
-
-                            actionParent.classList.add('ama-native-permission-actions');
-                            actionParent.querySelectorAll('button').forEach(button => {
-                                button.classList.add('ama-native-permission-action');
-
-                                if (button.dataset.amaPermissionAction === 'grant') return;
-
-                                const label = button.getAttribute('aria-label') || button.getAttribute('title') || 'Settings';
-                                button.dataset.amaPermissionAction = 'settings';
-                                button.title = label || 'Settings';
-                                button.setAttribute('aria-label', label || 'Settings');
-                            });
-                        });
                     }
 
                     function openAmaModal(title, contentHtml) {
@@ -3404,7 +3272,6 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(document);
-                                enhancePermissionRequiredControls(document);
                                 ensureGlobalFullCatalogButton();
                             }
 
@@ -3428,9 +3295,6 @@ function init() {
 
                         if (root.matches && root.matches(cardQuery)) {
                             enhanceExtensionCard(root);
-                            if (featureSettings.betterMarketplace) {
-                                enhancePermissionRequiredControls(root);
-                            }
                             return;
                         }
 
@@ -3452,7 +3316,6 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(root);
-                                enhancePermissionRequiredControls(root);
                                 ensureGlobalFullCatalogButton();
                             }
 
