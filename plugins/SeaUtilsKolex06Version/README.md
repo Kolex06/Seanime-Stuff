@@ -35,55 +35,13 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
-### 1.2.78
-- Scans raw visible text nodes for `Grant` and removes the text even when Seanime does not expose it on a clickable element.
-- Uses the found Grant text node to force-layout the surrounding permission action row.
-
-### 1.2.77
-- Adds a direct CSS fallback for Seanime's native top-right extension-card action area.
-- Forces native action buttons to icon-only sizing even when Grant cannot be detected through the DOM scanner.
-
-### 1.2.76
-- Adds a section-level fallback for the Permissions required area instead of relying only on finding the visible Grant control.
-- Styles action clusters inside permission cards even when Seanime hides Grant behind custom markup.
-
-### 1.2.75
-- Detects permissions-required Grant controls even when Seanime renders them as role buttons, links, or custom button components instead of real `button` elements.
-- Applies the same forced layout to clickable siblings in the permissions action row.
-
-### 1.2.74
-- Makes permissions-required action cleanup independent from the Better Marketplace toggle.
-- Forces the detected Grant/settings row into the card corner with inline layout so Seanime styles cannot keep it overlapping content.
-- Re-scans the page for delayed permission buttons.
-
-### 1.2.73
-- Moves the native permissions-required action row onto the extension card so it no longer overlaps the card content.
-- Hides the Grant text more aggressively while keeping Seanime's original button and click handler.
-
-### 1.2.72
-- Fixed the generated browser script so SeaUtils features run again.
-- Replaced manifest-link regex literals with template-safe matching for Full Catalog and Code actions.
-
-### 1.2.71
-- Re-added permissions-required action styling using safe CSS-only icon rendering.
-- Hides Grant text without replacing Seanime's native button contents.
-- Gives the Grant/settings buttons their own compact action area so they stop sitting on top of card content.
-
-### 1.2.70
-- Rolled back the native permissions-required action override that could stop SeaUtils from running.
-- Kept the update-glow detection fixes and forced a fresh marketplace rebuild.
-
-### 1.2.69
-- Broadened permission-required action detection beyond normal extension card classes.
-- Force-hides Grant text and styles the native Grant/settings action row directly.
+### 1.2.79
+- Removed the custom Permissions required / Grant button overrides so Seanime's native permission cards are left alone again.
+- Kept the rest of SeaUtils active, including Better Marketplace, Full Catalog, carousels, update badges, tray preferences, and Sub/Dub icons.
 
 ### 1.2.68
 - Improved update-card matching for cards that hide the extension ID.
 - Restored inline blue update glow so update cards remain visible when Seanime overrides injected CSS.
-
-### 1.2.67
-- Made permission-required extension actions cleaner and icon-only.
-- Prevented Grant/settings controls from overlapping extension card content.
 
 ### 1.2.66
 - Added marketplace-version versus installed-version detection for update glow.
