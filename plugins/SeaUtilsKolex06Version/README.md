@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.72
+- Fixed the generated browser script so SeaUtils features run again.
+- Replaced manifest-link regex literals with template-safe matching for Full Catalog and Code actions.
+
 ### 1.2.71
 - Re-added permissions-required action styling using safe CSS-only icon rendering.
 - Hides Grant text without replacing Seanime's native button contents.

@@ -1811,7 +1811,8 @@ function init() {
                         const badges = Array.from(card.querySelectorAll('.UI-Badge__root')).map(badge => badge.textContent.trim()).filter(Boolean);
                         const idEl = card.querySelector('.text-xs .opacity-30, [data-extension-id], [data-extension-card-id]');
                         const titleEl = card.querySelector('.font-semibold');
-                        const manifestLink = Array.from(card.querySelectorAll('a[href]')).map(link => link.getAttribute('href') || '').find(href => /plugins\/[^\/]+\.json/i.test(href)) || '';
+                        const manifestLinkPattern = new RegExp('plugins/[^/?#]+[.]json', 'i');
+                        const manifestLink = Array.from(card.querySelectorAll('a[href]')).map(link => link.getAttribute('href') || '').find(href => manifestLinkPattern.test(href)) || '';
                         const manifestId = getExtensionIdFromManifestUri(manifestLink);
 
                         return {
@@ -1888,7 +1889,7 @@ function init() {
 
                     function getExtensionIdFromManifestUri(value) {
                         const text = String(value || '');
-                        const match = text.match(/plugins\/([^\/?#]+)\.json/i);
+                        const match = text.match(new RegExp('plugins/([^/?#]+)[.]json', 'i'));
                         if (!match) return '';
 
                         const file = match[1].toLowerCase();
