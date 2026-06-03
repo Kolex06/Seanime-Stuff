@@ -599,6 +599,13 @@ function init() {
                 font-size: 0 !important;
             }
 
+            [data-ama-permission-section="true"] [class*="Grant"],
+            [data-ama-permission-section="true"] [class*="grant"] {
+                color: transparent !important;
+                font-size: 0 !important;
+                text-indent: -9999px !important;
+            }
+
             .ama-native-permission-action svg {
                 width: 18px !important;
                 height: 18px !important;
@@ -2116,9 +2123,119 @@ function init() {
                         }
                     }
 
+                    function findPermissionSections(root) {
+                        const sections = [];
+                        const scope = root && root.querySelectorAll ? root : document;
+                        const textNodes = [];
+
+                        if (scope.matches && /permissions required/i.test(String(scope.textContent || ''))) {
+                            textNodes.push(scope);
+                        }
+
+                        scope.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div').forEach(node => {
+                            const text = String(node.textContent || '').trim();
+                            if (/^permissions required$/i.test(text) || /\bpermissions required\b/i.test(text)) {
+                                textNodes.push(node);
+                            }
+                        });
+
+                        textNodes.forEach(node => {
+                            let parent = node;
+                            for (let i = 0; i < 5 && parent && parent !== document.body; i += 1) {
+                                const hasCards = parent.querySelector && (
+                                    parent.querySelector('.group\\\\/extension-card') ||
+                                    parent.querySelector('[class*="extension-card"]') ||
+                                    parent.querySelector('[class*="ExtensionCard"]') ||
+                                    parent.querySelector('.UI-Card__root') ||
+                                    parent.querySelector('[class*="UI-Card"]')
+                                );
+
+                                const hasGrant = /\bgrant\b/i.test(String(parent.textContent || ''));
+
+                                if (hasCards && hasGrant) {
+                                    sections.push(parent);
+                                    return;
+                                }
+
+                                parent = parent.parentElement;
+                            }
+                        });
+
+                        return sections.filter((section, index, list) => section && list.indexOf(section) === index);
+                    }
+
+                    function findPermissionCardsInSection(section) {
+                        if (!section || !section.querySelectorAll) return [];
+
+                        const cards = [];
+                        const candidates = [
+                            ...section.querySelectorAll('.group\\\\/extension-card'),
+                            ...section.querySelectorAll('[class*="extension-card"]'),
+                            ...section.querySelectorAll('[class*="ExtensionCard"]'),
+                            ...section.querySelectorAll('.UI-Card__root'),
+                            ...section.querySelectorAll('[class*="UI-Card"]'),
+                        ];
+
+                        candidates.forEach(candidate => {
+                            if (!candidate || cards.includes(candidate)) return;
+
+                            const text = String(candidate.textContent || '');
+                            const hasGrant = /\bgrant\b/i.test(text);
+                            const hasBadge = /english|multi|asuna|seautils|sync|plugin/i.test(text);
+                            const rect = candidate.getBoundingClientRect ? candidate.getBoundingClientRect() : null;
+                            const usefulSize = !rect || (rect.width >= 120 && rect.height >= 44 && rect.width <= 620 && rect.height <= 260);
+
+                            if (usefulSize && (hasGrant || hasBadge)) {
+                                cards.push(candidate);
+                            }
+                        });
+
+                        return cards;
+                    }
+
+                    function enhancePermissionSectionFallback(root) {
+                        try {
+                            findPermissionSections(root).forEach(section => {
+                                section.dataset.amaPermissionSection = 'true';
+
+                                findPermissionCardsInSection(section).forEach(card => {
+                                    card.dataset.amaPermissionCard = 'true';
+                                    card.style.setProperty('position', 'relative', 'important');
+                                    card.style.setProperty('padding-right', '112px', 'important');
+                                    card.style.setProperty('min-height', '94px', 'important');
+
+                                    const controls = Array.from(card.querySelectorAll(permissionActionQuery));
+                                    const grantControl = controls.find(control => isGrantPermissionControl(control));
+                                    const actionControls = grantControl ? collectPermissionActionControls(grantControl) : controls.slice(-2);
+
+                                    if (!actionControls.length) return;
+
+                                    let actions = actionControls[0].parentElement;
+                                    if (!actions) return;
+
+                                    if (actions.parentElement !== card) {
+                                        card.appendChild(actions);
+                                    }
+
+                                    forcePermissionActionLayout(card, actions);
+
+                                    actionControls.forEach((control, index) => {
+                                        const isGrant = control === grantControl || isGrantPermissionControl(control) || (!grantControl && index === 0);
+                                        forcePermissionControlLayout(control, isGrant);
+                                        if (!isGrant) {
+                                            control.dataset.amaPermissionAction = 'settings';
+                                        }
+                                    });
+                                });
+                            });
+                        } catch (_) {}
+                    }
+
                     function enhancePermissionRequiredControls(root) {
                         try {
                             if (!root) return;
+
+                            enhancePermissionSectionFallback(root);
 
                             const controls = [];
 

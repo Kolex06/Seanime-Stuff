@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.76
+- Adds a section-level fallback for the Permissions required area instead of relying only on finding the visible Grant control.
+- Styles action clusters inside permission cards even when Seanime hides Grant behind custom markup.
+
 ### 1.2.75
 - Detects permissions-required Grant controls even when Seanime renders them as role buttons, links, or custom button components instead of real `button` elements.
 - Applies the same forced layout to clickable siblings in the permissions action row.
