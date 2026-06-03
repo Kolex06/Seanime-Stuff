@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.78
+- Scans raw visible text nodes for `Grant` and removes the text even when Seanime does not expose it on a clickable element.
+- Uses the found Grant text node to force-layout the surrounding permission action row.
+
 ### 1.2.77
 - Adds a direct CSS fallback for Seanime's native top-right extension-card action area.
 - Forces native action buttons to icon-only sizing even when Grant cannot be detected through the DOM scanner.

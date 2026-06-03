@@ -2315,11 +2315,87 @@ function init() {
                         } catch (_) {}
                     }
 
+                    function getGrantTextNodes(root) {
+                        const scope = root && root.nodeType === 1 ? root : document.body;
+                        if (!scope || !document.createTreeWalker) return [];
+
+                        const nodes = [];
+                        const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+                            acceptNode(node) {
+                                return /\bgrant\b/i.test(String(node.nodeValue || '').trim())
+                                    ? NodeFilter.FILTER_ACCEPT
+                                    : NodeFilter.FILTER_REJECT;
+                            }
+                        });
+
+                        let node = walker.nextNode();
+                        while (node) {
+                            nodes.push(node);
+                            node = walker.nextNode();
+                        }
+
+                        return nodes;
+                    }
+
+                    function findActionRowFromGrantText(textNode) {
+                        let node = textNode && textNode.parentElement;
+
+                        while (node && node !== document.body) {
+                            const hasClickable = node.querySelector && node.querySelector(permissionActionQuery);
+                            const text = String(node.textContent || '');
+                            const rect = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+                            const compact = !rect || (rect.width <= 180 && rect.height <= 80);
+
+                            if (compact && hasClickable && /\bgrant\b/i.test(text)) {
+                                return node;
+                            }
+
+                            if (node.matches && node.matches(permissionActionQuery)) {
+                                return node.parentElement || node;
+                            }
+
+                            node = node.parentElement;
+                        }
+
+                        return textNode && textNode.parentElement;
+                    }
+
+                    function enhanceGrantTextNodes(root) {
+                        try {
+                            getGrantTextNodes(root).forEach(textNode => {
+                                const textParent = textNode.parentElement;
+                                const actionRow = findActionRowFromGrantText(textNode);
+                                const grantControl = textParent && textParent.closest ? textParent.closest(permissionActionQuery) : null;
+                                const card = getPermissionCardForControl(grantControl || textParent || actionRow);
+
+                                if (textParent && textParent.style) {
+                                    textParent.style.setProperty('font-size', '0', 'important');
+                                    textParent.style.setProperty('color', 'transparent', 'important');
+                                    textParent.style.setProperty('text-indent', '-9999px', 'important');
+                                }
+
+                                textNode.nodeValue = '';
+
+                                if (card && actionRow) {
+                                    if (actionRow.parentElement !== card) {
+                                        card.appendChild(actionRow);
+                                    }
+
+                                    forcePermissionActionLayout(card, actionRow);
+                                    collectPermissionActionControls(grantControl || actionRow).forEach(control => {
+                                        forcePermissionControlLayout(control, control === grantControl || isGrantPermissionControl(control));
+                                    });
+                                }
+                            });
+                        } catch (_) {}
+                    }
+
                     function enhancePermissionRequiredControls(root) {
                         try {
                             if (!root) return;
 
                             enhancePermissionSectionFallback(root);
+                            enhanceGrantTextNodes(root);
 
                             const controls = [];
 
