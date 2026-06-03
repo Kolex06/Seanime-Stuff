@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.75
+- Detects permissions-required Grant controls even when Seanime renders them as role buttons, links, or custom button components instead of real `button` elements.
+- Applies the same forced layout to clickable siblings in the permissions action row.
+
 ### 1.2.74
 - Makes permissions-required action cleanup independent from the Better Marketplace toggle.
 - Forces the detected Grant/settings row into the card corner with inline layout so Seanime styles cannot keep it overlapping content.

@@ -2001,33 +2001,35 @@ function init() {
                         cards.forEach(card => markExtensionUpdateState(card));
                     }
 
-                    function isGrantPermissionButton(button) {
-                        if (!button) return false;
+                    const permissionActionQuery = 'button, [role="button"], a, [tabindex], [class*="Button"], [class*="button"]';
+
+                    function isGrantPermissionControl(control) {
+                        if (!control) return false;
 
                         const text = [
-                            button.textContent || '',
-                            button.getAttribute && button.getAttribute('aria-label') || '',
-                            button.getAttribute && button.getAttribute('title') || '',
+                            control.textContent || '',
+                            control.getAttribute && control.getAttribute('aria-label') || '',
+                            control.getAttribute && control.getAttribute('title') || '',
                         ].join(' ').trim();
 
                         return /\bgrant\b/i.test(text);
                     }
 
-                    function getPermissionCardForButton(button) {
-                        if (!button || !button.closest) return null;
+                    function getPermissionCardForControl(control) {
+                        if (!control || !control.closest) return null;
 
                         const directCard = (
-                            button.closest('.group\\\\/extension-card') ||
-                            button.closest('[class*="extension-card"]') ||
-                            button.closest('[class*="ExtensionCard"]') ||
-                            button.closest('[data-ama-permission-card="true"]') ||
-                            button.closest('.UI-Card__root') ||
-                            button.closest('[class*="UI-Card"]')
+                            control.closest('.group\\\\/extension-card') ||
+                            control.closest('[class*="extension-card"]') ||
+                            control.closest('[class*="ExtensionCard"]') ||
+                            control.closest('[data-ama-permission-card="true"]') ||
+                            control.closest('.UI-Card__root') ||
+                            control.closest('[class*="UI-Card"]')
                         );
 
                         if (directCard) return directCard;
 
-                        let node = button.parentElement;
+                        let node = control.parentElement;
                         let best = null;
 
                         while (node && node !== document.body) {
@@ -2046,20 +2048,20 @@ function init() {
                         if (best) return best;
 
                         return (
-                            button.parentElement && button.parentElement.parentElement
+                            control.parentElement && control.parentElement.parentElement
                         );
                     }
 
-                    function collectPermissionActionButtons(button) {
+                    function collectPermissionActionControls(control) {
                         const actions = [];
-                        const parent = button && button.parentElement;
+                        const parent = control && control.parentElement;
 
                         if (parent && parent.querySelectorAll) {
-                            parent.querySelectorAll('button').forEach(actionButton => actions.push(actionButton));
+                            parent.querySelectorAll(permissionActionQuery).forEach(actionControl => actions.push(actionControl));
                         }
 
-                        if (!actions.includes(button)) {
-                            actions.unshift(button);
+                        if (!actions.includes(control)) {
+                            actions.unshift(control);
                         }
 
                         return actions;
@@ -2088,29 +2090,29 @@ function init() {
                         actions.style.setProperty('margin', '0', 'important');
                     }
 
-                    function forcePermissionButtonLayout(actionButton, isGrant) {
-                        if (!actionButton || !actionButton.style) return;
+                    function forcePermissionControlLayout(actionControl, isGrant) {
+                        if (!actionControl || !actionControl.style) return;
 
-                        actionButton.classList.add('ama-native-permission-action');
-                        actionButton.style.setProperty('width', '34px', 'important');
-                        actionButton.style.setProperty('height', '34px', 'important');
-                        actionButton.style.setProperty('min-width', '34px', 'important');
-                        actionButton.style.setProperty('min-height', '34px', 'important');
-                        actionButton.style.setProperty('padding', '0', 'important');
-                        actionButton.style.setProperty('border-radius', '10px', 'important');
-                        actionButton.style.setProperty('display', 'inline-flex', 'important');
-                        actionButton.style.setProperty('align-items', 'center', 'important');
-                        actionButton.style.setProperty('justify-content', 'center', 'important');
-                        actionButton.style.setProperty('overflow', 'hidden', 'important');
-                        actionButton.style.setProperty('white-space', 'nowrap', 'important');
+                        actionControl.classList.add('ama-native-permission-action');
+                        actionControl.style.setProperty('width', '34px', 'important');
+                        actionControl.style.setProperty('height', '34px', 'important');
+                        actionControl.style.setProperty('min-width', '34px', 'important');
+                        actionControl.style.setProperty('min-height', '34px', 'important');
+                        actionControl.style.setProperty('padding', '0', 'important');
+                        actionControl.style.setProperty('border-radius', '10px', 'important');
+                        actionControl.style.setProperty('display', 'inline-flex', 'important');
+                        actionControl.style.setProperty('align-items', 'center', 'important');
+                        actionControl.style.setProperty('justify-content', 'center', 'important');
+                        actionControl.style.setProperty('overflow', 'hidden', 'important');
+                        actionControl.style.setProperty('white-space', 'nowrap', 'important');
 
                         if (isGrant) {
-                            actionButton.dataset.amaPermissionAction = 'grant';
-                            actionButton.title = 'Grant permissions';
-                            actionButton.setAttribute('aria-label', 'Grant permissions');
-                            actionButton.style.setProperty('font-size', '0', 'important');
-                            actionButton.style.setProperty('color', 'transparent', 'important');
-                            actionButton.style.setProperty('text-indent', '-9999px', 'important');
+                            actionControl.dataset.amaPermissionAction = 'grant';
+                            actionControl.title = 'Grant permissions';
+                            actionControl.setAttribute('aria-label', 'Grant permissions');
+                            actionControl.style.setProperty('font-size', '0', 'important');
+                            actionControl.style.setProperty('color', 'transparent', 'important');
+                            actionControl.style.setProperty('text-indent', '-9999px', 'important');
                         }
                     }
 
@@ -2118,26 +2120,26 @@ function init() {
                         try {
                             if (!root) return;
 
-                            const buttons = [];
+                            const controls = [];
 
-                            if (root.matches && root.matches('button')) {
-                                buttons.push(root);
+                            if (root.matches && root.matches(permissionActionQuery)) {
+                                controls.push(root);
                             }
 
                             if (root.querySelectorAll) {
-                                root.querySelectorAll('button').forEach(button => buttons.push(button));
+                                root.querySelectorAll(permissionActionQuery).forEach(control => controls.push(control));
                             }
 
-                            buttons.forEach(button => {
-                                if (!isGrantPermissionButton(button)) return;
+                            controls.forEach(control => {
+                                if (!isGrantPermissionControl(control)) return;
 
-                                const card = getPermissionCardForButton(button);
+                                const card = getPermissionCardForControl(control);
                                 if (!card) return;
 
                                 card.dataset.amaPermissionCard = 'true';
 
-                                let actions = button.closest && button.closest('.ama-native-permission-actions');
-                                if (!actions) actions = button.parentElement;
+                                let actions = control.closest && control.closest('.ama-native-permission-actions');
+                                if (!actions) actions = control.parentElement;
                                 if (!actions) return;
 
                                 if (actions.parentElement !== card) {
@@ -2146,17 +2148,17 @@ function init() {
 
                                 forcePermissionActionLayout(card, actions);
 
-                                collectPermissionActionButtons(button).forEach(actionButton => {
-                                    if (actionButton === button || isGrantPermissionButton(actionButton)) {
-                                        forcePermissionButtonLayout(actionButton, true);
+                                collectPermissionActionControls(control).forEach(actionControl => {
+                                    if (actionControl === control || isGrantPermissionControl(actionControl)) {
+                                        forcePermissionControlLayout(actionControl, true);
                                         return;
                                     }
 
-                                    actionButton.dataset.amaPermissionAction = 'settings';
-                                    forcePermissionButtonLayout(actionButton, false);
+                                    actionControl.dataset.amaPermissionAction = 'settings';
+                                    forcePermissionControlLayout(actionControl, false);
 
-                                    if (!actionButton.getAttribute('aria-label')) {
-                                        actionButton.setAttribute('aria-label', actionButton.getAttribute('title') || 'Settings');
+                                    if (!actionControl.getAttribute('aria-label')) {
+                                        actionControl.setAttribute('aria-label', actionControl.getAttribute('title') || 'Settings');
                                     }
                                 });
                             });
@@ -3678,7 +3680,7 @@ function init() {
                                     node.matches(targetGridsQuery) ||
                                     node.matches(mediaEntryCardQuery) ||
                                     node.matches(cardQuery) ||
-                                    node.matches('button') ||
+                                    node.matches(permissionActionQuery) ||
                                     node.matches('svg')
                                 ) {
                                     scheduleRoot(node);
@@ -3687,7 +3689,7 @@ function init() {
 
                                 if (
                                     node.querySelector &&
-                                    node.querySelector(arrowQuery + ', ' + targetGridsQuery + ', ' + mediaEntryCardQuery + ', ' + cardQuery + ', button, svg')
+                                    node.querySelector(arrowQuery + ', ' + targetGridsQuery + ', ' + mediaEntryCardQuery + ', ' + cardQuery + ', ' + permissionActionQuery + ', svg')
                                 ) {
                                     scheduleRoot(node);
                                 }
