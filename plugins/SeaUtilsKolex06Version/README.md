@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.69
+- Broadened permission-required action detection beyond normal extension card classes.
+- Force-hides Grant text and styles the native Grant/settings action row directly.
+
 ### 1.2.68
 - Improved update-card matching for cards that hide the extension ID.
 - Restored inline blue update glow so update cards remain visible when Seanime overrides injected CSS.

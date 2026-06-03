@@ -782,7 +782,7 @@ function init() {
                 background: rgba(255,255,255,0.14) !important;
             }
 
-            body[data-ama-better-marketplace="true"] .group\/extension-card[data-ama-permission-required="true"] {
+            body[data-ama-better-marketplace="true"] [data-ama-permission-required="true"] {
                 position: relative !important;
                 padding-right: 92px !important;
             }
@@ -813,10 +813,16 @@ function init() {
                 line-height: 1 !important;
             }
 
+            body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"] {
+                font-size: 0 !important;
+                color: #f8d16b !important;
+            }
+
             body[data-ama-better-marketplace="true"] .ama-native-permission-action svg {
                 width: 18px !important;
                 height: 18px !important;
                 flex: 0 0 auto !important;
+                font-size: 18px !important;
             }
 
             body[data-ama-better-marketplace="true"] .ama-code-preview {
@@ -1981,44 +1987,47 @@ function init() {
                     function enhancePermissionRequiredControls(root) {
                         if (!root || !root.querySelectorAll) return;
 
-                        const cards = [];
+                        const buttons = [];
 
-                        if (root.matches && root.matches('.group\\\\/extension-card')) {
-                            cards.push(root);
+                        if (root.matches && root.matches('button')) {
+                            buttons.push(root);
                         }
 
-                        root.querySelectorAll('.group\\\\/extension-card').forEach(card => cards.push(card));
+                        root.querySelectorAll('button').forEach(button => buttons.push(button));
 
-                        cards.forEach(card => {
-                            const buttons = Array.from(card.querySelectorAll('button'));
-                            const grantButtons = buttons.filter(button => {
-                                const text = String(button.textContent || '').trim();
-                                const aria = button.getAttribute('aria-label') || '';
-                                const title = button.getAttribute('title') || '';
+                        const grantButtons = buttons.filter(button => {
+                            const text = String(button.textContent || '').trim();
+                            const aria = button.getAttribute('aria-label') || '';
+                            const title = button.getAttribute('title') || '';
 
-                                return /\bgrant\b/i.test([text, aria, title].join(' '));
-                            });
+                            return /\bgrant\b/i.test([text, aria, title].join(' '));
+                        });
 
-                            if (!grantButtons.length) {
-                                delete card.dataset.amaPermissionRequired;
-                                return;
-                            }
+                        grantButtons.forEach(button => {
+                            const card = button.closest('.group\\\\/extension-card') ||
+                                button.closest('[data-ama-permission-card]') ||
+                                button.closest('[class*="extension-card"]') ||
+                                button.closest('[class*="ExtensionCard"]') ||
+                                button.closest('[class*="UI-Card"]') ||
+                                button.closest('.UI-Card__root') ||
+                                button.parentElement;
+
+                            if (!card) return;
 
                             card.dataset.amaPermissionRequired = 'true';
+                            card.dataset.amaPermissionCard = 'true';
 
-                            grantButtons.forEach(button => {
-                                button.classList.add('ama-native-permission-action');
-                                button.dataset.amaPermissionAction = 'grant';
-                                button.title = 'Grant permissions';
-                                button.setAttribute('aria-label', 'Grant permissions');
+                            button.classList.add('ama-native-permission-action');
+                            button.dataset.amaPermissionAction = 'grant';
+                            button.title = 'Grant permissions';
+                            button.setAttribute('aria-label', 'Grant permissions');
 
-                                if (button.dataset.amaGrantIconApplied !== 'true') {
-                                    button.dataset.amaGrantIconApplied = 'true';
-                                    button.innerHTML = GRANT_ICON;
-                                }
-                            });
+                            if (button.innerHTML !== GRANT_ICON) {
+                                button.dataset.amaGrantIconApplied = 'true';
+                                button.innerHTML = GRANT_ICON;
+                            }
 
-                            const actionParent = grantButtons[0].parentElement;
+                            const actionParent = button.parentElement;
                             if (!actionParent) return;
 
                             actionParent.classList.add('ama-native-permission-actions');
