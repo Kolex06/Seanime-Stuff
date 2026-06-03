@@ -11,6 +11,7 @@ interface AmaSettings {
     carouselsManga: boolean
     carouselsOther: boolean
     subDubIcons: boolean
+    hideFileNames: boolean
 }
 
 function init() {
@@ -26,6 +27,7 @@ function init() {
             carouselsManga: true,
             carouselsOther: true,
             subDubIcons: true,
+            hideFileNames: false,
         }
 
         function getStorageApi(): any | null {
@@ -51,6 +53,7 @@ function init() {
                 carouselsManga: saved.carouselsManga !== false,
                 carouselsOther: saved.carouselsOther !== false,
                 subDubIcons: saved.subDubIcons !== false,
+                hideFileNames: saved.hideFileNames === true,
             }
         }
 
@@ -85,6 +88,7 @@ function init() {
         const carouselsMangaRef = ctx.fieldRef<boolean>(settingsState.get().carouselsManga)
         const carouselsOtherRef = ctx.fieldRef<boolean>(settingsState.get().carouselsOther)
         const subDubIconsRef = ctx.fieldRef<boolean>(settingsState.get().subDubIcons)
+        const hideFileNamesRef = ctx.fieldRef<boolean>(settingsState.get().hideFileNames)
 
         const trayIconUrl = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/SeaUtils-Kolex06-Version.png"
 
@@ -153,6 +157,10 @@ function init() {
             updateSetting("subDubIcons", !!value)
         })
 
+        hideFileNamesRef.onValueChange((value) => {
+            updateSetting("hideFileNames", !!value)
+        })
+
         tray.render(() => {
             return tray.stack([
                 tray.text("SeaUtils Kolex06-Version Settings"),
@@ -177,12 +185,52 @@ function init() {
                 tray.switch("Sub/Dub Icons", {
                     fieldRef: subDubIconsRef,
                 }),
+                tray.switch("Hide File Names", {
+                    fieldRef: hideFileNamesRef,
+                }),
             ])
         })
 
         const initialFeatureSettings = settingsState.get()
 
         const carouselCSS = `
+            body[data-ama-hide-file-names="true"] [data-episode-grid-item-filename="true"] {
+                display: none !important;
+            }
+
+            body[data-ama-better-marketplace="true"][data-ama-carousels-active="true"] .group\\/extension-card .absolute.top-3.right-3.flex.flex-col.gap-1 {
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 4px !important;
+                padding: 4px !important;
+                min-width: 0 !important;
+                width: auto !important;
+                max-width: max-content !important;
+            }
+
+            body[data-ama-better-marketplace="true"][data-ama-carousels-active="true"] .group\\/extension-card .absolute.top-3.right-3.flex.flex-col.gap-1 > button:not(.UI-IconButton_root) {
+                width: 32px !important;
+                min-width: 32px !important;
+                max-width: 32px !important;
+                height: 32px !important;
+                padding: 0 !important;
+                flex: 0 0 32px !important;
+            }
+
+            body[data-ama-better-marketplace="true"][data-ama-carousels-active="true"] .group\\/extension-card .absolute.top-3.right-3.flex.flex-col.gap-1 > button:not(.UI-IconButton_root) > .UI-Button__icon {
+                margin-inline-end: 0 !important;
+            }
+
+            body[data-ama-better-marketplace="true"][data-ama-carousels-active="true"] .group\\/extension-card .absolute.top-3.right-3.flex.flex-col.gap-1 > button:not(.UI-IconButton_root) > span:not(.UI-Button__icon) {
+                display: none !important;
+                opacity: 0 !important;
+                visibility: hidden !important;
+                width: 0 !important;
+                max-width: 0 !important;
+                overflow: hidden !important;
+            }
+
             .ama-carousel-nav-btn,
             button.ama-carousel-nav-btn,
             .ama-manga-carousel-parent > .ama-carousel-nav-btn,
@@ -986,6 +1034,7 @@ function init() {
                         betterMarketplace: true,
                         carousels: true,
                         subDubIcons: true,
+                        hideFileNames: false,
                     };
 
                     function readBrowserSettings() {
@@ -1108,6 +1157,7 @@ function init() {
                         document.body.setAttribute('data-ama-carousel-page', getCarouselPageKey());
                         document.body.setAttribute('data-ama-carousels-active', String(areCarouselsEnabledForCurrentPage()));
                         document.body.setAttribute('data-ama-subdub-icons', String(!!featureSettings.subDubIcons));
+                        document.body.setAttribute('data-ama-hide-file-names', String(!!featureSettings.hideFileNames));
                     }
 
                     function escapeHtml(value) {
@@ -2229,12 +2279,13 @@ function init() {
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Manga</label><input data-ama-pref="carouselsManga" type="checkbox"></div>' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Other Pages</label><input data-ama-pref="carouselsOther" type="checkbox"></div>' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Sub/Dub Icons</label><input data-ama-pref="subDubIcons" type="checkbox"></div>' +
+                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Hide File Names</label><input data-ama-pref="hideFileNames" type="checkbox"></div>' +
                                 '<div class="ama-config-actions"><button type="button" class="ama-config-save">Save</button><span class="ama-config-status"></span></div>' +
                             '</div>';
 
                         bindAmaModalClose(modal);
 
-                        ['betterMarketplace', 'carousels', 'carouselsSearch', 'carouselsLists', 'carouselsManga', 'carouselsOther', 'subDubIcons'].forEach(key => {
+                        ['betterMarketplace', 'carousels', 'carouselsSearch', 'carouselsLists', 'carouselsManga', 'carouselsOther', 'subDubIcons', 'hideFileNames'].forEach(key => {
                             const input = modal.querySelector('[data-ama-pref="' + key + '"]');
                             if (input) input.checked = current[key] !== false;
                         });
@@ -2252,6 +2303,7 @@ function init() {
                                     carouselsManga: !!(modal.querySelector('[data-ama-pref="carouselsManga"]') || {}).checked,
                                     carouselsOther: !!(modal.querySelector('[data-ama-pref="carouselsOther"]') || {}).checked,
                                     subDubIcons: !!(modal.querySelector('[data-ama-pref="subDubIcons"]') || {}).checked,
+                                    hideFileNames: !!(modal.querySelector('[data-ama-pref="hideFileNames"]') || {}).checked,
                                 };
 
                                 if (typeof window.__AMA_SAVE_SETTINGS__ === 'function') {
