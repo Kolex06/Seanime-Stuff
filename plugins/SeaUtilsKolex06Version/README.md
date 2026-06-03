@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.70
+- Rolled back the native permissions-required action override that could stop SeaUtils from running.
+- Kept the update-glow detection fixes and forced a fresh marketplace rebuild.
+
 ### 1.2.69
 - Broadened permission-required action detection beyond normal extension card classes.
 - Force-hides Grant text and styles the native Grant/settings action row directly.
