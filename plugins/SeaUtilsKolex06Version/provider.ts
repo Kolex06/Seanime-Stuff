@@ -611,6 +611,90 @@ function init() {
                 height: 18px !important;
             }
 
+            .group\/extension-card:has([class*="top-3"][class*="right-3"]),
+            [class*="extension-card"]:has([class*="top-3"][class*="right-3"]),
+            [class*="ExtensionCard"]:has([class*="top-3"][class*="right-3"]),
+            .UI-Card__root:has([class*="top-3"][class*="right-3"]) {
+                position: relative !important;
+                padding-right: 108px !important;
+                min-height: 94px !important;
+            }
+
+            .group\/extension-card [class*="top-3"][class*="right-3"],
+            [class*="extension-card"] [class*="top-3"][class*="right-3"],
+            [class*="ExtensionCard"] [class*="top-3"][class*="right-3"],
+            .UI-Card__root [class*="top-3"][class*="right-3"] {
+                position: absolute !important;
+                top: 10px !important;
+                right: 10px !important;
+                left: auto !important;
+                bottom: auto !important;
+                display: inline-flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: flex-end !important;
+                gap: 6px !important;
+                width: auto !important;
+                min-width: 0 !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                transform: none !important;
+                z-index: 80 !important;
+            }
+
+            .group\/extension-card [class*="top-3"][class*="right-3"] > *,
+            [class*="extension-card"] [class*="top-3"][class*="right-3"] > *,
+            [class*="ExtensionCard"] [class*="top-3"][class*="right-3"] > *,
+            .UI-Card__root [class*="top-3"][class*="right-3"] > * {
+                display: inline-flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 6px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: auto !important;
+                height: auto !important;
+            }
+
+            .group\/extension-card [class*="top-3"][class*="right-3"] button,
+            .group\/extension-card [class*="top-3"][class*="right-3"] [role="button"],
+            .group\/extension-card [class*="top-3"][class*="right-3"] a,
+            [class*="extension-card"] [class*="top-3"][class*="right-3"] button,
+            [class*="extension-card"] [class*="top-3"][class*="right-3"] [role="button"],
+            [class*="extension-card"] [class*="top-3"][class*="right-3"] a,
+            [class*="ExtensionCard"] [class*="top-3"][class*="right-3"] button,
+            [class*="ExtensionCard"] [class*="top-3"][class*="right-3"] [role="button"],
+            [class*="ExtensionCard"] [class*="top-3"][class*="right-3"] a,
+            .UI-Card__root [class*="top-3"][class*="right-3"] button,
+            .UI-Card__root [class*="top-3"][class*="right-3"] [role="button"],
+            .UI-Card__root [class*="top-3"][class*="right-3"] a {
+                width: 34px !important;
+                height: 34px !important;
+                min-width: 34px !important;
+                min-height: 34px !important;
+                padding: 0 !important;
+                border-radius: 10px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+                white-space: nowrap !important;
+                font-size: 0 !important;
+                line-height: 1 !important;
+            }
+
+            .group\/extension-card [class*="top-3"][class*="right-3"] svg,
+            [class*="extension-card"] [class*="top-3"][class*="right-3"] svg,
+            [class*="ExtensionCard"] [class*="top-3"][class*="right-3"] svg,
+            .UI-Card__root [class*="top-3"][class*="right-3"] svg {
+                width: 18px !important;
+                height: 18px !important;
+                min-width: 18px !important;
+                color: currentColor !important;
+            }
+
             body[data-ama-better-marketplace="true"] .ama-extension-carousel {
                 display: flex !important;
                 flex-wrap: nowrap !important;

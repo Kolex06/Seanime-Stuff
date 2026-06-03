@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.77
+- Adds a direct CSS fallback for Seanime's native top-right extension-card action area.
+- Forces native action buttons to icon-only sizing even when Grant cannot be detected through the DOM scanner.
+
 ### 1.2.76
 - Adds a section-level fallback for the Permissions required area instead of relying only on finding the visible Grant control.
 - Styles action clusters inside permission cards even when Seanime hides Grant behind custom markup.
