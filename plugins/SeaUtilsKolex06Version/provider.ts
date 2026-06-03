@@ -543,13 +543,13 @@ function init() {
                 background: rgba(14, 165, 233, 0.18) !important;
             }
 
-            body[data-ama-better-marketplace="true"] [data-ama-permission-card="true"] {
+            [data-ama-permission-card="true"] {
                 position: relative !important;
-                padding-right: 104px !important;
+                padding-right: 112px !important;
                 min-height: 94px !important;
             }
 
-            body[data-ama-better-marketplace="true"] .ama-native-permission-actions {
+            .ama-native-permission-actions {
                 position: absolute !important;
                 top: 12px !important;
                 right: 12px !important;
@@ -561,7 +561,7 @@ function init() {
                 pointer-events: auto !important;
             }
 
-            body[data-ama-better-marketplace="true"] .ama-native-permission-action {
+            .ama-native-permission-action {
                 width: 34px !important;
                 height: 34px !important;
                 min-width: 34px !important;
@@ -576,13 +576,13 @@ function init() {
                 line-height: 1 !important;
             }
 
-            body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"] {
+            .ama-native-permission-action[data-ama-permission-action="grant"] {
                 color: transparent !important;
                 font-size: 0 !important;
                 text-indent: -9999px !important;
             }
 
-            body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"]::before {
+            .ama-native-permission-action[data-ama-permission-action="grant"]::before {
                 content: "" !important;
                 display: block !important;
                 width: 18px !important;
@@ -594,12 +594,12 @@ function init() {
                 mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3Zm3.7 8.7-4.5 4.5a1 1 0 0 1-1.4 0l-2-2 1.4-1.4 1.3 1.29 3.8-3.79 1.4 1.4Z'/%3E%3C/svg%3E") center / contain no-repeat !important;
             }
 
-            body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"] * {
+            .ama-native-permission-action[data-ama-permission-action="grant"] * {
                 color: transparent !important;
                 font-size: 0 !important;
             }
 
-            body[data-ama-better-marketplace="true"] .ama-native-permission-action svg {
+            .ama-native-permission-action svg {
                 width: 18px !important;
                 height: 18px !important;
             }
@@ -2016,13 +2016,37 @@ function init() {
                     function getPermissionCardForButton(button) {
                         if (!button || !button.closest) return null;
 
-                        return (
+                        const directCard = (
                             button.closest('.group\\\\/extension-card') ||
                             button.closest('[class*="extension-card"]') ||
                             button.closest('[class*="ExtensionCard"]') ||
                             button.closest('[data-ama-permission-card="true"]') ||
                             button.closest('.UI-Card__root') ||
                             button.closest('[class*="UI-Card"]')
+                        );
+
+                        if (directCard) return directCard;
+
+                        let node = button.parentElement;
+                        let best = null;
+
+                        while (node && node !== document.body) {
+                            const text = String(node.textContent || '');
+                            const rect = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+                            const hasUsefulSize = rect && rect.width >= 160 && rect.width <= 520 && rect.height >= 54 && rect.height <= 220;
+
+                            if (hasUsefulSize && /permissions required|grant|english|asuna|seautils|sync/i.test(text)) {
+                                best = node;
+                                break;
+                            }
+
+                            node = node.parentElement;
+                        }
+
+                        if (best) return best;
+
+                        return (
+                            button.parentElement && button.parentElement.parentElement
                         );
                     }
 
@@ -2041,9 +2065,58 @@ function init() {
                         return actions;
                     }
 
+                    function forcePermissionActionLayout(card, actions) {
+                        if (!card || !actions || !card.style || !actions.style) return;
+
+                        card.dataset.amaPermissionCard = 'true';
+                        card.style.setProperty('position', 'relative', 'important');
+                        card.style.setProperty('padding-right', '112px', 'important');
+                        card.style.setProperty('min-height', '94px', 'important');
+
+                        actions.classList.add('ama-native-permission-actions');
+                        actions.style.setProperty('position', 'absolute', 'important');
+                        actions.style.setProperty('top', '12px', 'important');
+                        actions.style.setProperty('right', '12px', 'important');
+                        actions.style.setProperty('left', 'auto', 'important');
+                        actions.style.setProperty('bottom', 'auto', 'important');
+                        actions.style.setProperty('display', 'inline-flex', 'important');
+                        actions.style.setProperty('flex-direction', 'row', 'important');
+                        actions.style.setProperty('align-items', 'center', 'important');
+                        actions.style.setProperty('gap', '6px', 'important');
+                        actions.style.setProperty('z-index', '60', 'important');
+                        actions.style.setProperty('transform', 'none', 'important');
+                        actions.style.setProperty('margin', '0', 'important');
+                    }
+
+                    function forcePermissionButtonLayout(actionButton, isGrant) {
+                        if (!actionButton || !actionButton.style) return;
+
+                        actionButton.classList.add('ama-native-permission-action');
+                        actionButton.style.setProperty('width', '34px', 'important');
+                        actionButton.style.setProperty('height', '34px', 'important');
+                        actionButton.style.setProperty('min-width', '34px', 'important');
+                        actionButton.style.setProperty('min-height', '34px', 'important');
+                        actionButton.style.setProperty('padding', '0', 'important');
+                        actionButton.style.setProperty('border-radius', '10px', 'important');
+                        actionButton.style.setProperty('display', 'inline-flex', 'important');
+                        actionButton.style.setProperty('align-items', 'center', 'important');
+                        actionButton.style.setProperty('justify-content', 'center', 'important');
+                        actionButton.style.setProperty('overflow', 'hidden', 'important');
+                        actionButton.style.setProperty('white-space', 'nowrap', 'important');
+
+                        if (isGrant) {
+                            actionButton.dataset.amaPermissionAction = 'grant';
+                            actionButton.title = 'Grant permissions';
+                            actionButton.setAttribute('aria-label', 'Grant permissions');
+                            actionButton.style.setProperty('font-size', '0', 'important');
+                            actionButton.style.setProperty('color', 'transparent', 'important');
+                            actionButton.style.setProperty('text-indent', '-9999px', 'important');
+                        }
+                    }
+
                     function enhancePermissionRequiredControls(root) {
                         try {
-                            if (!root || !root.querySelectorAll) return;
+                            if (!root) return;
 
                             const buttons = [];
 
@@ -2051,7 +2124,9 @@ function init() {
                                 buttons.push(root);
                             }
 
-                            root.querySelectorAll('button').forEach(button => buttons.push(button));
+                            if (root.querySelectorAll) {
+                                root.querySelectorAll('button').forEach(button => buttons.push(button));
+                            }
 
                             buttons.forEach(button => {
                                 if (!isGrantPermissionButton(button)) return;
@@ -2065,23 +2140,20 @@ function init() {
                                 if (!actions) actions = button.parentElement;
                                 if (!actions) return;
 
-                                actions.classList.add('ama-native-permission-actions');
-
                                 if (actions.parentElement !== card) {
                                     card.appendChild(actions);
                                 }
 
-                                collectPermissionActionButtons(button).forEach(actionButton => {
-                                    actionButton.classList.add('ama-native-permission-action');
+                                forcePermissionActionLayout(card, actions);
 
+                                collectPermissionActionButtons(button).forEach(actionButton => {
                                     if (actionButton === button || isGrantPermissionButton(actionButton)) {
-                                        actionButton.dataset.amaPermissionAction = 'grant';
-                                        actionButton.title = 'Grant permissions';
-                                        actionButton.setAttribute('aria-label', 'Grant permissions');
+                                        forcePermissionButtonLayout(actionButton, true);
                                         return;
                                     }
 
                                     actionButton.dataset.amaPermissionAction = 'settings';
+                                    forcePermissionButtonLayout(actionButton, false);
 
                                     if (!actionButton.getAttribute('aria-label')) {
                                         actionButton.setAttribute('aria-label', actionButton.getAttribute('title') || 'Settings');
@@ -3438,6 +3510,8 @@ function init() {
                         if (root === document) {
                             document.querySelectorAll('.ama-carousel-nav-btn').forEach(btn => btn.remove());
 
+                            enhancePermissionRequiredControls(document);
+
                             document.querySelectorAll('.ama-manga-carousel-parent').forEach(parent => {
                                 parent.classList.remove('ama-manga-carousel-parent');
                             });
@@ -3459,7 +3533,6 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(document);
-                                enhancePermissionRequiredControls(document);
                                 ensureGlobalFullCatalogButton();
                             }
 
@@ -3470,6 +3543,7 @@ function init() {
 
                         removeArrowArtifacts(root);
                         removeRandomSearchIcons(root);
+                        enhancePermissionRequiredControls(root);
 
                         if (root.matches && root.matches(targetGridsQuery)) {
                             enhanceCarouselGrid(root);
@@ -3485,7 +3559,6 @@ function init() {
                             enhanceExtensionCard(root);
                             if (featureSettings.betterMarketplace) {
                                 markMarketplaceExtensionCards(root);
-                                enhancePermissionRequiredControls(root);
                             }
                             return;
                         }
@@ -3508,7 +3581,6 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(root);
-                                enhancePermissionRequiredControls(root);
                                 ensureGlobalFullCatalogButton();
                             }
 
@@ -3587,6 +3659,9 @@ function init() {
                     window.addEventListener('popstate', refreshForRouteChange);
                     window.addEventListener('hashchange', refreshForRouteChange);
                     setInterval(refreshForRouteChange, 500);
+                    setInterval(() => {
+                        enhancePermissionRequiredControls(document);
+                    }, 900);
 
                     setBodyFlags();
                     writeBrowserSettings(featureSettings);
