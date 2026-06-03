@@ -545,7 +545,8 @@ function init() {
 
             body[data-ama-better-marketplace="true"] [data-ama-permission-card="true"] {
                 position: relative !important;
-                padding-right: 96px !important;
+                padding-right: 104px !important;
+                min-height: 94px !important;
             }
 
             body[data-ama-better-marketplace="true"] .ama-native-permission-actions {
@@ -576,8 +577,9 @@ function init() {
             }
 
             body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"] {
-                color: #f8d16b !important;
+                color: transparent !important;
                 font-size: 0 !important;
+                text-indent: -9999px !important;
             }
 
             body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"]::before {
@@ -585,9 +587,16 @@ function init() {
                 display: block !important;
                 width: 18px !important;
                 height: 18px !important;
-                background: currentColor !important;
+                flex: 0 0 auto !important;
+                text-indent: 0 !important;
+                background: #f8d16b !important;
                 -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3Zm3.7 8.7-4.5 4.5a1 1 0 0 1-1.4 0l-2-2 1.4-1.4 1.3 1.29 3.8-3.79 1.4 1.4Z'/%3E%3C/svg%3E") center / contain no-repeat !important;
                 mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3Zm3.7 8.7-4.5 4.5a1 1 0 0 1-1.4 0l-2-2 1.4-1.4 1.3 1.29 3.8-3.79 1.4 1.4Z'/%3E%3C/svg%3E") center / contain no-repeat !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"] * {
+                color: transparent !important;
+                font-size: 0 !important;
             }
 
             body[data-ama-better-marketplace="true"] .ama-native-permission-action svg {
@@ -2009,12 +2018,27 @@ function init() {
 
                         return (
                             button.closest('.group\\\\/extension-card') ||
-                            button.closest('[data-ama-permission-card="true"]') ||
-                            button.closest('.UI-Card__root') ||
                             button.closest('[class*="extension-card"]') ||
                             button.closest('[class*="ExtensionCard"]') ||
+                            button.closest('[data-ama-permission-card="true"]') ||
+                            button.closest('.UI-Card__root') ||
                             button.closest('[class*="UI-Card"]')
                         );
+                    }
+
+                    function collectPermissionActionButtons(button) {
+                        const actions = [];
+                        const parent = button && button.parentElement;
+
+                        if (parent && parent.querySelectorAll) {
+                            parent.querySelectorAll('button').forEach(actionButton => actions.push(actionButton));
+                        }
+
+                        if (!actions.includes(button)) {
+                            actions.unshift(button);
+                        }
+
+                        return actions;
                     }
 
                     function enhancePermissionRequiredControls(root) {
@@ -2037,12 +2061,17 @@ function init() {
 
                                 card.dataset.amaPermissionCard = 'true';
 
-                                const actions = button.parentElement;
+                                let actions = button.closest && button.closest('.ama-native-permission-actions');
+                                if (!actions) actions = button.parentElement;
                                 if (!actions) return;
 
                                 actions.classList.add('ama-native-permission-actions');
 
-                                actions.querySelectorAll('button').forEach(actionButton => {
+                                if (actions.parentElement !== card) {
+                                    card.appendChild(actions);
+                                }
+
+                                collectPermissionActionButtons(button).forEach(actionButton => {
                                     actionButton.classList.add('ama-native-permission-action');
 
                                     if (actionButton === button || isGrantPermissionButton(actionButton)) {
