@@ -543,6 +543,58 @@ function init() {
                 background: rgba(14, 165, 233, 0.18) !important;
             }
 
+            body[data-ama-better-marketplace="true"] [data-ama-permission-card="true"] {
+                position: relative !important;
+                padding-right: 96px !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-native-permission-actions {
+                position: absolute !important;
+                top: 12px !important;
+                right: 12px !important;
+                display: inline-flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                gap: 6px !important;
+                z-index: 60 !important;
+                pointer-events: auto !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-native-permission-action {
+                width: 34px !important;
+                height: 34px !important;
+                min-width: 34px !important;
+                min-height: 34px !important;
+                padding: 0 !important;
+                border-radius: 10px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+                white-space: nowrap !important;
+                line-height: 1 !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"] {
+                color: #f8d16b !important;
+                font-size: 0 !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-native-permission-action[data-ama-permission-action="grant"]::before {
+                content: "" !important;
+                display: block !important;
+                width: 18px !important;
+                height: 18px !important;
+                background: currentColor !important;
+                -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3Zm3.7 8.7-4.5 4.5a1 1 0 0 1-1.4 0l-2-2 1.4-1.4 1.3 1.29 3.8-3.79 1.4 1.4Z'/%3E%3C/svg%3E") center / contain no-repeat !important;
+                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3Zm3.7 8.7-4.5 4.5a1 1 0 0 1-1.4 0l-2-2 1.4-1.4 1.3 1.29 3.8-3.79 1.4 1.4Z'/%3E%3C/svg%3E") center / contain no-repeat !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-native-permission-action svg {
+                width: 18px !important;
+                height: 18px !important;
+            }
+
             body[data-ama-better-marketplace="true"] .ama-extension-carousel {
                 display: flex !important;
                 flex-wrap: nowrap !important;
@@ -1032,7 +1084,7 @@ function init() {
                     const SETTINGS_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>';
                     let dubIdSetPromise = null;
                     const dragScrollEnhancementVersion = 'v8';
-                    const marketplaceEnhancementVersion = 'v11';
+                    const marketplaceEnhancementVersion = 'v12';
                     const catalogActionSources = new Map();
                     let allExtensionsPromise = null;
                     let catalogActionSourceCounter = 0;
@@ -1937,6 +1989,76 @@ function init() {
                         root.querySelectorAll('.group\\\\/extension-card').forEach(card => cards.push(card));
 
                         cards.forEach(card => markExtensionUpdateState(card));
+                    }
+
+                    function isGrantPermissionButton(button) {
+                        if (!button) return false;
+
+                        const text = [
+                            button.textContent || '',
+                            button.getAttribute && button.getAttribute('aria-label') || '',
+                            button.getAttribute && button.getAttribute('title') || '',
+                        ].join(' ').trim();
+
+                        return /\bgrant\b/i.test(text);
+                    }
+
+                    function getPermissionCardForButton(button) {
+                        if (!button || !button.closest) return null;
+
+                        return (
+                            button.closest('.group\\\\/extension-card') ||
+                            button.closest('[data-ama-permission-card="true"]') ||
+                            button.closest('.UI-Card__root') ||
+                            button.closest('[class*="extension-card"]') ||
+                            button.closest('[class*="ExtensionCard"]') ||
+                            button.closest('[class*="UI-Card"]')
+                        );
+                    }
+
+                    function enhancePermissionRequiredControls(root) {
+                        try {
+                            if (!root || !root.querySelectorAll) return;
+
+                            const buttons = [];
+
+                            if (root.matches && root.matches('button')) {
+                                buttons.push(root);
+                            }
+
+                            root.querySelectorAll('button').forEach(button => buttons.push(button));
+
+                            buttons.forEach(button => {
+                                if (!isGrantPermissionButton(button)) return;
+
+                                const card = getPermissionCardForButton(button);
+                                if (!card) return;
+
+                                card.dataset.amaPermissionCard = 'true';
+
+                                const actions = button.parentElement;
+                                if (!actions) return;
+
+                                actions.classList.add('ama-native-permission-actions');
+
+                                actions.querySelectorAll('button').forEach(actionButton => {
+                                    actionButton.classList.add('ama-native-permission-action');
+
+                                    if (actionButton === button || isGrantPermissionButton(actionButton)) {
+                                        actionButton.dataset.amaPermissionAction = 'grant';
+                                        actionButton.title = 'Grant permissions';
+                                        actionButton.setAttribute('aria-label', 'Grant permissions');
+                                        return;
+                                    }
+
+                                    actionButton.dataset.amaPermissionAction = 'settings';
+
+                                    if (!actionButton.getAttribute('aria-label')) {
+                                        actionButton.setAttribute('aria-label', actionButton.getAttribute('title') || 'Settings');
+                                    }
+                                });
+                            });
+                        } catch (_) {}
                     }
 
                     function openAmaModal(title, contentHtml) {
@@ -3307,6 +3429,7 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(document);
+                                enhancePermissionRequiredControls(document);
                                 ensureGlobalFullCatalogButton();
                             }
 
@@ -3330,6 +3453,10 @@ function init() {
 
                         if (root.matches && root.matches(cardQuery)) {
                             enhanceExtensionCard(root);
+                            if (featureSettings.betterMarketplace) {
+                                markMarketplaceExtensionCards(root);
+                                enhancePermissionRequiredControls(root);
+                            }
                             return;
                         }
 
@@ -3351,6 +3478,7 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(root);
+                                enhancePermissionRequiredControls(root);
                                 ensureGlobalFullCatalogButton();
                             }
 
@@ -3445,6 +3573,7 @@ function init() {
                                     node.matches(targetGridsQuery) ||
                                     node.matches(mediaEntryCardQuery) ||
                                     node.matches(cardQuery) ||
+                                    node.matches('button') ||
                                     node.matches('svg')
                                 ) {
                                     scheduleRoot(node);
@@ -3453,7 +3582,7 @@ function init() {
 
                                 if (
                                     node.querySelector &&
-                                    node.querySelector(arrowQuery + ', ' + targetGridsQuery + ', ' + mediaEntryCardQuery + ', ' + cardQuery + ', svg')
+                                    node.querySelector(arrowQuery + ', ' + targetGridsQuery + ', ' + mediaEntryCardQuery + ', ' + cardQuery + ', button, svg')
                                 ) {
                                     scheduleRoot(node);
                                 }

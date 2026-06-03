@@ -35,6 +35,11 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.71
+- Re-added permissions-required action styling using safe CSS-only icon rendering.
+- Hides Grant text without replacing Seanime's native button contents.
+- Gives the Grant/settings buttons their own compact action area so they stop sitting on top of card content.
+
 ### 1.2.70
 - Rolled back the native permissions-required action override that could stop SeaUtils from running.
 - Kept the update-glow detection fixes and forced a fresh marketplace rebuild.
