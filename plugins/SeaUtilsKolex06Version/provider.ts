@@ -1810,9 +1810,12 @@ function init() {
                         const badges = Array.from(card.querySelectorAll('.UI-Badge__root')).map(badge => badge.textContent.trim()).filter(Boolean);
                         const idEl = card.querySelector('.text-xs .opacity-30, [data-extension-id], [data-extension-card-id]');
                         const titleEl = card.querySelector('.font-semibold');
+                        const manifestLinkPattern = new RegExp('plugins/[^/?#]+[.]json', 'i');
+                        const manifestLink = Array.from(card.querySelectorAll('a[href]')).map(link => link.getAttribute('href') || '').find(href => manifestLinkPattern.test(href)) || '';
+                        const manifestId = getExtensionIdFromManifestUri(manifestLink);
 
                         return {
-                            id: (idEl && idEl.textContent.trim()) || '',
+                            id: (idEl && idEl.textContent.trim()) || manifestId || getKnownExtensionIdFromText(card.innerText || card.textContent || ''),
                             name: (titleEl && titleEl.textContent.trim()) || paragraphs[0] || 'Extension',
                             description: paragraphs[2] || paragraphs[1] || '',
                             version: badges[0] || '',
@@ -1883,11 +1886,45 @@ function init() {
                         return 0;
                     }
 
+                    function getExtensionIdFromManifestUri(value) {
+                        const text = String(value || '');
+                        const match = text.match(new RegExp('plugins/([^/?#]+)[.]json', 'i'));
+                        if (!match) return '';
+
+                        const file = match[1].toLowerCase();
+                        if (file === 'seautils-kolex06-version') return 'SeaUtils-Kolex06-Version';
+                        if (file === 'asunatracks-sync') return 'asunatracks-sync';
+
+                        return match[1];
+                    }
+
+                    function getKnownExtensionIdFromText(value) {
+                        const text = normalizeExtensionText(value);
+
+                        if (text.includes('asunatracks sync') || text.includes('asunatracks-sync')) {
+                            return 'asunatracks-sync';
+                        }
+
+                        if (text.includes('seautils kolex06-version') || text.includes('seautils-kolex06-version')) {
+                            return 'SeaUtils-Kolex06-Version';
+                        }
+
+                        return '';
+                    }
+
                     function applyExtensionUpdateStyle(card, hasUpdate) {
                         if (!card) return;
 
                         if (hasUpdate) {
                             card.dataset.amaUpdateAvailable = 'true';
+
+                            if (card.style) {
+                                card.style.setProperty('border-color', 'rgba(56, 189, 248, 0.95)', 'important');
+                                card.style.setProperty('outline', '1px solid rgba(56, 189, 248, 0.85)', 'important');
+                                card.style.setProperty('outline-offset', '0', 'important');
+                                card.style.setProperty('box-shadow', '0 0 0 1px rgba(56, 189, 248, 0.75), 0 0 18px rgba(56, 189, 248, 0.24)', 'important');
+                                card.style.setProperty('background', 'rgba(14, 165, 233, 0.12)', 'important');
+                            }
                         } else {
                             delete card.dataset.amaUpdateAvailable;
 

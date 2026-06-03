@@ -38,6 +38,7 @@ The Full Catalog popup keeps extension actions close to each card:
 ### 1.2.67
 - Added Hide File Names for local library episode filenames.
 - Added the marketplace carousel action-button layout fix from ASleepyDrink's SeaUtils changes.
+- Added update-card matching/glow improvements for cards that only expose the extension through manifest links or visible card text.
 
 ### 1.2.66
 - Added marketplace-version versus installed-version detection for update glow.
