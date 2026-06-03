@@ -520,8 +520,8 @@ function init() {
 				fieldRef,
 				type: password ? "password" : "text",
 				disabled: state.busy.get(),
-				className: "border",
-				style: { backgroundColor: theme.panel, borderColor: theme.border, color: theme.text },
+				className: "border focus-visible:ring-1",
+				style: { backgroundColor: theme.panel, borderColor: "#2c3a5c", color: theme.text, "--ring": theme.pink },
 			} as any);
 		}
 

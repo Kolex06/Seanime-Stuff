@@ -31,6 +31,10 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.21
+
+- Softened the login/settings text input borders so `Username` and `AsunaTracks URL` no longer look like warning fields.
+
 ### 0.1.20
 
 - Updated sync payloads to use the newer AsunaTracks public API fields.
