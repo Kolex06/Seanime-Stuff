@@ -878,8 +878,12 @@ function init() {
 					}
 
 					.rich-media {
-						width: fit-content;
+						display: inline-flex;
+						align-self: flex-start;
+						width: auto;
 						max-width: 100%;
+						line-height: 0;
+						box-sizing: border-box;
 						overflow: hidden;
 						border: 1px solid rgba(125, 211, 252, 0.24);
 						border-radius: 8px;
@@ -890,6 +894,8 @@ function init() {
 					.rich-media img,
 					.rich-media video {
 						display: block;
+						width: auto;
+						height: auto;
 						max-width: min(100%, 420px);
 						max-height: 380px;
 						object-fit: contain;

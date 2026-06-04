@@ -18,6 +18,9 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.6
+- Makes the image/gif/video embed border fit tightly around the media instead of stretching across the text area.
+
 ### 1.0.5
 - Only attempts real `http`/`https` user embeds and strips bad AniList image markup cleanly.
 
