@@ -72,7 +72,39 @@ function init() {
 			return String(token);
 		}
 
+		let aniListRateLimitedUntil = 0;
+
+		function aniListRateLimitMessage() {
+			const seconds = Math.max(1, Math.ceil((aniListRateLimitedUntil - Date.now()) / 1000));
+			return `AniList rate limited requests. Wait about ${seconds}s before refreshing or loading more notifications.`;
+		}
+
+		function isAniListRateLimited() {
+			return Date.now() < aniListRateLimitedUntil;
+		}
+
+		function noteAniListRateLimit(res: any) {
+			let waitMs = 90 * 1000;
+
+			try {
+				const retryAfter = Number(res?.headers?.get?.("Retry-After") || 0);
+				if (retryAfter > 0) waitMs = retryAfter * 1000;
+			} catch (_) {}
+
+			try {
+				const resetAt = Number(res?.headers?.get?.("X-RateLimit-Reset") || 0);
+				if (resetAt > 0) waitMs = Math.max(waitMs, (resetAt * 1000) - Date.now());
+			} catch (_) {}
+
+			aniListRateLimitedUntil = Math.max(aniListRateLimitedUntil, Date.now() + Math.max(waitMs, 30 * 1000));
+			return aniListRateLimitMessage();
+		}
+
 		async function anilistFetch(query: string, variables: Record<string, any> = {}) {
+			if (isAniListRateLimited()) {
+				throw new Error(aniListRateLimitMessage());
+			}
+
 			const token = getAniListToken();
 			const res = await ctx.fetch("https://graphql.anilist.co", {
 				method: "POST",
@@ -84,6 +116,10 @@ function init() {
 			});
 
 			if (!res.ok) {
+				if (res.status === 429) {
+					throw new Error(noteAniListRateLimit(res));
+				}
+
 				let detail = "";
 				try {
 					detail = await res.text();
@@ -301,8 +337,13 @@ function init() {
 			}
 		`;
 
-		const NOTIFICATIONS_PER_PAGE = 50;
+		const NOTIFICATIONS_PER_PAGE = 25;
+		const PREFETCH_DETAIL_LIMIT = 4;
+		const PREFETCH_DETAIL_DELAY_MS = 2600;
 		const loadingActivityIds = new Set<number>();
+		const prefetchedActivityIds = new Set<number>();
+		const activityDetailQueue: number[] = [];
+		let activityDetailTimer: any = null;
 
 		function notificationGlobalIndex(page: number, index: number): number {
 			return Math.max(0, (Number(page || 1) - 1) * NOTIFICATIONS_PER_PAGE + index);
@@ -319,6 +360,40 @@ function init() {
 			if (type === "ACTIVITY_LIKE" && !item.activity.media && !item.activity.text && !item.activity.message) return true;
 			if (type.indexOf("LIKE") !== -1 && !item.activity.media && !item.activity.text && !item.activity.message) return true;
 			return false;
+		}
+
+		function stopActivityPrefetchQueue() {
+			activityDetailQueue.length = 0;
+			if (activityDetailTimer) {
+				clearTimeout(activityDetailTimer);
+				activityDetailTimer = null;
+			}
+		}
+
+		function scheduleActivityPrefetch() {
+			if (activityDetailTimer || !activityDetailQueue.length || isAniListRateLimited()) return;
+			activityDetailTimer = setTimeout(async () => {
+				activityDetailTimer = null;
+				if (isAniListRateLimited()) {
+					stopActivityPrefetchQueue();
+					return;
+				}
+
+				const id = activityDetailQueue.shift();
+				if (!id || loadingActivityIds.has(id) || prefetchedActivityIds.has(id)) {
+					scheduleActivityPrefetch();
+					return;
+				}
+
+				loadingActivityIds.add(id);
+				try {
+					await loadActivityDetail(id, true);
+					prefetchedActivityIds.add(id);
+				} finally {
+					loadingActivityIds.delete(id);
+					scheduleActivityPrefetch();
+				}
+			}, PREFETCH_DETAIL_DELAY_MS);
 		}
 
 		function mergeNotifications(existing: AniListNotification[], incoming: AniListNotification[]) {
@@ -342,18 +417,27 @@ function init() {
 		}
 
 		function prefetchActivityDetails(items: AniListNotification[]) {
+			if (isAniListRateLimited()) return;
+			let added = 0;
 			for (const item of items) {
 				const id = Number(item.activityId || 0);
-				if (!id || loadingActivityIds.has(id) || !shouldPrefetchActivityDetail(item)) continue;
-				loadingActivityIds.add(id);
-				loadActivityDetail(id, true).finally(() => loadingActivityIds.delete(id));
+				if (!id || loadingActivityIds.has(id) || prefetchedActivityIds.has(id) || activityDetailQueue.includes(id) || !shouldPrefetchActivityDetail(item)) continue;
+				activityDetailQueue.push(id);
+				added += 1;
+				if (added >= PREFETCH_DETAIL_LIMIT) break;
 			}
+			scheduleActivityPrefetch();
 		}
 
 		async function fetchNotifications(resetNotificationCount = false, page = 1, append = false) {
 			if (append ? loadingMore.get() : loading.get()) return;
+			if (isAniListRateLimited()) {
+				error.set(aniListRateLimitMessage());
+				return;
+			}
 
 			try {
+				if (!append) stopActivityPrefetchQueue();
 				if (append) {
 					loadingMore.set(true);
 				} else {
@@ -789,6 +873,10 @@ function init() {
 						max-height: 210px;
 					}
 
+					.card-rich .rich-media {
+						max-width: min(100%, 340px);
+					}
+
 					.media-pill {
 						display: inline-flex;
 						align-items: center;
@@ -987,13 +1075,13 @@ function init() {
 					}
 
 					.rich-media {
-						display: inline-flex;
+						display: block;
 						align-self: flex-start;
-						width: auto;
-						max-width: 100%;
+						width: max-content;
+						max-width: min(100%, 420px);
 						flex: 0 1 auto;
 						line-height: 0;
-						box-sizing: border-box;
+						box-sizing: content-box;
 						overflow: hidden;
 						border: 1px solid rgba(125, 211, 252, 0.24);
 						border-radius: 8px;
@@ -1006,7 +1094,7 @@ function init() {
 						display: block;
 						width: auto;
 						height: auto;
-						max-width: min(100%, 420px);
+						max-width: 100%;
 						max-height: 380px;
 						object-fit: contain;
 					}
@@ -1297,6 +1385,27 @@ function init() {
 							}
 						}
 
+						function fitRichMediaFrame(frame, media) {
+							function applyFit() {
+								var run = window.requestAnimationFrame || function(fn) { setTimeout(fn, 0); };
+								run(function() {
+									var rect = media.getBoundingClientRect ? media.getBoundingClientRect() : null;
+									if (!rect || rect.width <= 0) return;
+									frame.style.width = Math.ceil(rect.width) + 'px';
+								});
+							}
+
+							if (media.tagName === 'IMG') {
+								if (media.complete) applyFit();
+								media.addEventListener('load', applyFit, { once: true });
+								return;
+							}
+
+							media.addEventListener('loadedmetadata', applyFit, { once: true });
+							media.addEventListener('canplay', applyFit, { once: true });
+							setTimeout(applyFit, 0);
+						}
+
 						function appendVideoEmbed(frame, wrap, url) {
 							var video = document.createElement('video');
 							video.src = url;
@@ -1310,6 +1419,8 @@ function init() {
 							};
 							frame.textContent = '';
 							frame.appendChild(video);
+							fitRichMediaFrame(frame, video);
+							return video;
 						}
 
 						function appendRichContent(parent, value) {
@@ -1319,6 +1430,7 @@ function init() {
 							if (mediaOnly && parent.classList) parent.classList.add('media-only');
 
 							var wrap = create('div', 'rich-content');
+							var fitters = [];
 							if (mediaOnly) wrap.classList.add('media-only');
 							parts.forEach(function(part) {
 								if (part.type === 'media') {
@@ -1339,6 +1451,7 @@ function init() {
 											removeRichMedia(frame, wrap);
 										};
 										frame.appendChild(img);
+										fitters.push(function() { fitRichMediaFrame(frame, img); });
 									}
 									wrap.appendChild(frame);
 								} else {
@@ -1347,6 +1460,7 @@ function init() {
 							});
 
 							parent.appendChild(wrap);
+							fitters.forEach(function(fit) { fit(); });
 							return true;
 						}
 

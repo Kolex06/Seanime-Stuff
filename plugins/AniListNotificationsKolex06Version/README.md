@@ -18,6 +18,11 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.8
+- Stops background activity detail loading from sending many AniList requests at once.
+- Adds a cooldown message for AniList 429 rate limits instead of showing raw JSON.
+- Measures loaded image/gif/video embeds and tightens the frame to the rendered media width.
+
 ### 1.0.7
 - Prefetches activity details in the background so anime/media boxes can appear before opening a popup.
 - Adds a bottom "Show more" button to load older notifications.
