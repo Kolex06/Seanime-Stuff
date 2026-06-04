@@ -1015,6 +1015,16 @@ function init() {
 							return (div.textContent || div.innerText || '').trim();
 						}
 
+						function normalizeText(value) {
+							return stripHtml(value).replace(/\s+/g, ' ').trim().toLowerCase();
+						}
+
+						function sameText(left, right) {
+							var a = normalizeText(left);
+							var b = normalizeText(right);
+							return !!a && !!b && a === b;
+						}
+
 						function titleCase(value) {
 							return String(value || 'Notification')
 								.replace(/_/g, ' ')
@@ -1182,6 +1192,22 @@ function init() {
 							if (reason) return 'Reason: ' + reason;
 							if (item.deletedMediaTitles && item.deletedMediaTitles.length) return 'Merged titles: ' + item.deletedMediaTitles.join(', ');
 							return 'Open this notification for details and the AniList page link.';
+						}
+
+						function popupIntroText(item) {
+							var type = String(item.type || '');
+							var title = notificationTitle(item);
+							var liked = likedContent(item);
+							var text = notificationText(item);
+							var context = stripHtml(item.context);
+
+							if (type.indexOf('LIKE') !== -1) {
+								if (context && !sameText(context, title) && !sameText(context, liked)) return context;
+								return '';
+							}
+
+							if (!text || sameText(text, title) || sameText(text, liked)) return '';
+							return text;
 						}
 
 						function formatTime(ts) {
@@ -1410,11 +1436,6 @@ function init() {
 							var progressText = listProgressText(item);
 							if (progressText) copy.appendChild(create('div', 'liked-media-meta', progressText));
 
-							var url = mediaUrl(media);
-							if (url) {
-								copy.appendChild(linkButton(url, 'btn', 'external', 'Open ' + (media.type === 'MANGA' ? 'manga' : 'anime'), 'Open this title on AniList'));
-							}
-
 							box.appendChild(cover);
 							box.appendChild(copy);
 							parent.appendChild(box);
@@ -1519,20 +1540,27 @@ function init() {
 							var body = create('div', 'detail-sheet-body');
 							renderThumb(body, item, true);
 							var content = create('div');
-							content.appendChild(create('p', 'detail-sheet-text', notificationText(item)));
+							var introText = popupIntroText(item);
+							if (introText) content.appendChild(create('p', 'detail-sheet-text', introText));
 							var reply = matchedReply(item);
 							var commentLikeCount = item.comment && item.comment.likeCount;
 							var replyLikeCount = reply && reply.likeCount;
 							renderLikedMedia(content, item);
 
 							var grid = create('div', 'detail-grid');
+							var shownMediaTitle = mediaTitle(itemMedia(item));
+							var directMediaTitle = mediaTitle(item.media);
+							var activityMediaTitle = item.activity && item.activity.media ? mediaTitle(item.activity.media) : '';
+							if (shownMediaTitle && sameText(directMediaTitle, shownMediaTitle)) directMediaTitle = '';
+							if (shownMediaTitle && sameText(activityMediaTitle, shownMediaTitle)) activityMediaTitle = '';
+							if (directMediaTitle && sameText(activityMediaTitle, directMediaTitle)) activityMediaTitle = '';
 							var details = [
 								detail('When', formatTime(item.createdAt)),
 								detail('User', item.user && item.user.name ? '@' + item.user.name : ''),
 								detail('Activity owner', activityOwner(item.activity) ? '@' + activityOwner(item.activity) : ''),
 								detail('Reply by', reply && reply.user && reply.user.name ? '@' + reply.user.name : ''),
-								detail('Media', mediaTitle(item.media)),
-								detail('Activity media', item.activity && item.activity.media ? mediaTitle(item.activity.media) : ''),
+								detail('Media', directMediaTitle),
+								detail('Activity media', activityMediaTitle),
 								detail('Episode', item.episode),
 								detail('Thread', item.thread && item.thread.title),
 								detail('Like count', replyLikeCount !== undefined && replyLikeCount !== null ? replyLikeCount : commentLikeCount),
@@ -1542,7 +1570,7 @@ function init() {
 							].filter(Boolean);
 
 							details.forEach(function(node) { grid.appendChild(node); });
-							content.appendChild(grid);
+							if (details.length) content.appendChild(grid);
 
 							var likedText = likedContent(item);
 							if (likedText) {
@@ -1552,7 +1580,7 @@ function init() {
 
 							var quoteText = stripHtml((item.message && item.message.message) || (item.activity && (item.activity.text || item.activity.message)) || (item.comment && item.comment.comment));
 							if (quoteText) {
-								if (!likedText || quoteText !== likedText) {
+								if (!sameText(quoteText, likedText) && !sameText(quoteText, introText)) {
 									content.appendChild(create('div', 'detail-label', 'Context'));
 									content.appendChild(create('div', 'quote', quoteText));
 								}

@@ -18,6 +18,10 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.1
+- Removes repeated liked text, repeated media titles, and duplicate media action buttons from the notification popup.
+- Keeps watched episode/progress info in the media block and AniList links in the bottom action row.
+
 ### 1.0.0
 - First stable Kolex06 release for the GitHub marketplace.
 - Includes larger notification cards, readable detail popups, AniList page links, liked activity details, watched progress, and the PNG sidebar/extension icon.
