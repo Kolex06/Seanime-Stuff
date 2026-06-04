@@ -837,6 +837,34 @@ function init() {
 						background: rgba(2, 169, 255, 0.12);
 					}
 
+					.rich-content {
+						display: flex;
+						flex-direction: column;
+						gap: 10px;
+					}
+
+					.rich-content-text {
+						white-space: pre-wrap;
+						overflow-wrap: anywhere;
+					}
+
+					.rich-media {
+						width: fit-content;
+						max-width: 100%;
+						overflow: hidden;
+						border: 1px solid rgba(125, 211, 252, 0.24);
+						border-radius: 8px;
+						background: rgba(15, 23, 42, 0.45);
+					}
+
+					.rich-media img,
+					.rich-media video {
+						display: block;
+						max-width: min(100%, 420px);
+						max-height: 380px;
+						object-fit: contain;
+					}
+
 					.liked-media {
 						display: grid;
 						grid-template-columns: 72px minmax(0, 1fr);
@@ -1040,6 +1068,87 @@ function init() {
 							var a = normalizeText(left);
 							var b = normalizeText(right);
 							return !!a && !!b && a === b;
+						}
+
+						function safeMediaEmbedUrl(value) {
+							var url = String(value || '').trim().replace(/^<|>$/g, '');
+							try {
+								var parsed = new URL(url, window.location.href);
+								if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';
+								return parsed.href;
+							} catch (_) {
+								return '';
+							}
+						}
+
+						function imageUrlForDisplay(url) {
+							return String(url || '').replace(/\\.gifv(?=($|[?#]))/i, '.gif');
+						}
+
+						function richTextParts(value) {
+							var html = String(value || '');
+							var imageUrls = [];
+							html.replace(/<img\\b[^>]*\\bsrc=["']?([^"'\\s>]+)["']?[^>]*>/ig, function(_, url) {
+								var safe = safeMediaEmbedUrl(url);
+								if (safe) imageUrls.push(safe);
+								return '';
+							});
+
+							var text = stripHtml(html);
+							var parts = [];
+							var pattern = new RegExp('img\\\\d*\\\\((https?:\\\\/\\\\/[^)\\\\s]+)\\\\)|!\\\\[[^\\\\]]*\\\\]\\\\((https?:\\\\/\\\\/[^)\\\\s]+)\\\\)|(https?:\\\\/\\\\/[^\\\\s)]+\\\\.(?:png|jpe?g|gif|gifv|webp|avif)(?:\\\\?[^\\\\s)]*)?)', 'ig');
+							var lastIndex = 0;
+							var match;
+							while ((match = pattern.exec(text)) !== null) {
+								var before = text.slice(lastIndex, match.index);
+								if (before.trim()) parts.push({ type: 'text', text: before.trim() });
+								var safeUrl = safeMediaEmbedUrl(match[1] || match[2] || match[3]);
+								if (safeUrl) parts.push({ type: 'media', url: safeUrl });
+								lastIndex = pattern.lastIndex;
+							}
+
+							var after = text.slice(lastIndex);
+							if (after.trim()) parts.push({ type: 'text', text: after.trim() });
+
+							imageUrls.forEach(function(url) {
+								parts.push({ type: 'media', url: url });
+							});
+
+							return parts;
+						}
+
+						function appendRichContent(parent, value) {
+							var parts = richTextParts(value);
+							if (!parts.length) return false;
+
+							var wrap = create('div', 'rich-content');
+							parts.forEach(function(part) {
+								if (part.type === 'media') {
+									var frame = create('div', 'rich-media');
+									var img = document.createElement('img');
+									img.src = imageUrlForDisplay(part.url);
+									img.alt = '';
+									if (/\\.gifv(?:$|[?#])/i.test(part.url)) {
+										img.onerror = function() {
+											var video = document.createElement('video');
+											video.src = part.url;
+											video.autoplay = true;
+											video.loop = true;
+											video.muted = true;
+											video.playsInline = true;
+											frame.textContent = '';
+											frame.appendChild(video);
+										};
+									}
+									frame.appendChild(img);
+									wrap.appendChild(frame);
+								} else {
+									wrap.appendChild(create('div', 'rich-content-text', part.text));
+								}
+							});
+
+							parent.appendChild(wrap);
+							return true;
 						}
 
 						function titleCase(value) {
@@ -1454,12 +1563,7 @@ function init() {
 						function renderLikedMedia(parent, item) {
 							var media = itemMedia(item);
 							var title = mediaTitle(media);
-							if (!media || !title) {
-								if (String(item.type || '').includes('LIKE')) {
-									parent.appendChild(create('div', 'info-note', 'No anime or manga title is attached to this like.'));
-								}
-								return;
-							}
+							if (!media || !title) return;
 
 							var box = create('div', 'liked-media');
 							var cover = create('div', 'liked-media-cover');
@@ -1634,7 +1738,9 @@ function init() {
 								seen[key] = true;
 								var box = create('div', 'content-box');
 								box.appendChild(create('div', 'detail-label', block.label));
-								box.appendChild(create('div', 'quote', block.text));
+								var quote = create('div', 'quote');
+								appendRichContent(quote, block.text);
+								box.appendChild(quote);
 								parent.appendChild(box);
 							});
 						}
@@ -1663,7 +1769,9 @@ function init() {
 							renderThumb(body, item, true);
 							var content = create('div');
 							var introText = popupIntroText(item);
-							if (introText) content.appendChild(create('p', 'detail-sheet-text', introText));
+							var introHasMedia = richTextParts(introText).some(function(part) { return part.type === 'media'; });
+							if (introText && !introHasMedia) content.appendChild(create('p', 'detail-sheet-text', introText));
+							if (introHasMedia) introText = '';
 							var reply = matchedReply(item);
 							var commentLikeCount = item.comment && item.comment.likeCount;
 							var replyLikeCount = reply && reply.likeCount;

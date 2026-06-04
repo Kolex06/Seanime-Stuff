@@ -18,6 +18,11 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.3
+- Renders AniList-style image markup such as `img99999(...)` inside notification text boxes.
+- Shows `.gifv` embeds with an animated image fallback and video fallback.
+- Stops showing the no anime/manga attached note when an activity like has no media.
+
 ### 1.0.2
 - Keeps the sender/user avatar on the left side of opened notification details.
 - Shows anime and manga covers inside the media box instead of replacing the sender avatar.
