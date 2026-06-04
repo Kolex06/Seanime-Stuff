@@ -504,6 +504,20 @@ function init() {
 			}
 		}
 
+		function openSeanimeMedia(value: any) {
+			const mediaId = Number(value?.id);
+			if (!Number.isFinite(mediaId) || mediaId <= 0) return;
+
+			const type = String(value?.type || "").toUpperCase();
+			const path = type === "MANGA" ? "/manga/entry" : "/entry";
+
+			try {
+				ctx.screen.navigateTo(path, { id: String(mediaId) });
+			} catch (err: any) {
+				error.set(err?.message || "Could not open this title in Seanime.");
+			}
+		}
+
 		webview.channel.on("refresh", () => fetchNotifications(false));
 		webview.channel.on("mark-all-read", () => fetchNotifications(true));
 		webview.channel.on("load-more", () => {
@@ -513,6 +527,7 @@ function init() {
 		webview.channel.on("mark-read-local", (id: number) => markLocalRead(Number(id)));
 		webview.channel.on("load-activity-detail", (activityId: number) => loadActivityDetail(Number(activityId)));
 		webview.channel.on("open-url", (url: string) => openAniListUrl(url));
+		webview.channel.on("open-seanime-media", (value: any) => openSeanimeMedia(value));
 
 		webview.setContent(() => `
 			<!DOCTYPE html>
@@ -858,6 +873,27 @@ function init() {
 						background: var(--panel-soft);
 						color: var(--text);
 						font-weight: 750;
+					}
+
+					.media-pill.seanime-media-link,
+					.liked-media.seanime-media-link {
+						cursor: pointer;
+						transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+					}
+
+					.media-pill.seanime-media-link:hover,
+					.media-pill.seanime-media-link:focus-visible,
+					.liked-media.seanime-media-link:hover,
+					.liked-media.seanime-media-link:focus-visible {
+						border-color: rgba(125, 211, 252, 0.72);
+						background: rgba(2, 169, 255, 0.22);
+						outline: none;
+						transform: translateY(-1px);
+					}
+
+					.media-pill.seanime-media-link:focus-visible,
+					.liked-media.seanime-media-link:focus-visible {
+						box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.32);
 					}
 
 					.media-pill img {
@@ -1782,6 +1818,42 @@ function init() {
 							}
 						}
 
+						function seanimeMediaTarget(media) {
+							if (!media || !media.id) return null;
+							var type = String(media.type || '').toUpperCase() === 'MANGA' ? 'MANGA' : 'ANIME';
+							return { id: String(media.id), type: type };
+						}
+
+						function openSeanimeMedia(media, event) {
+							if (event) {
+								event.preventDefault();
+								event.stopPropagation();
+							}
+
+							var target = seanimeMediaTarget(media);
+							if (!target) return;
+							send('open-seanime-media', target);
+						}
+
+						function makeSeanimeMediaLink(node, media) {
+							if (!seanimeMediaTarget(media)) return node;
+
+							node.classList.add('seanime-media-link');
+							node.setAttribute('role', 'link');
+							node.setAttribute('tabindex', '0');
+							node.title = 'Open in Seanime';
+							node.onclick = function(event) {
+								openSeanimeMedia(media, event);
+							};
+							node.onkeydown = function(event) {
+								if (event.key === 'Enter' || event.key === ' ') {
+									openSeanimeMedia(media, event);
+								}
+							};
+
+							return node;
+						}
+
 						function linkButton(href, className, iconName, label, title) {
 							var link = document.createElement('a');
 							link.className = className;
@@ -1885,6 +1957,7 @@ function init() {
 
 							box.appendChild(cover);
 							box.appendChild(copy);
+							makeSeanimeMediaLink(box, media);
 							parent.appendChild(box);
 						}
 
@@ -1951,6 +2024,7 @@ function init() {
 									pill.appendChild(img);
 								}
 								pill.appendChild(create('span', '', media));
+								makeSeanimeMediaLink(pill, mediaSource);
 								main.appendChild(pill);
 							}
 

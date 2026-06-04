@@ -18,6 +18,9 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.12
+- Makes anime and manga boxes in notification cards and popups open the matching Seanime entry page.
+
 ### 1.0.11
 - Hides the generic open-for-details fallback text inside opened notification popups.
 
