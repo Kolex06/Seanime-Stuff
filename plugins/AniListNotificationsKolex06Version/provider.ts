@@ -27,12 +27,18 @@ function init() {
 		const notifications = ctx.state<AniListNotification[]>([]);
 		const unreadCount = ctx.state<number>(0);
 		const loading = ctx.state<boolean>(false);
+		const loadingMore = ctx.state<boolean>(false);
+		const hasNextPage = ctx.state<boolean>(false);
+		const currentPage = ctx.state<number>(1);
 		const error = ctx.state<string | null>(null);
 		const lastUpdated = ctx.state<string>("");
 
 		webview.channel.sync("notifications", notifications);
 		webview.channel.sync("unreadCount", unreadCount);
 		webview.channel.sync("loading", loading);
+		webview.channel.sync("loadingMore", loadingMore);
+		webview.channel.sync("hasNextPage", hasNextPage);
+		webview.channel.sync("currentPage", currentPage);
 		webview.channel.sync("error", error);
 		webview.channel.sync("lastUpdated", lastUpdated);
 
@@ -146,6 +152,10 @@ function init() {
 
 			query ($page: Int, $perPage: Int, $resetNotificationCount: Boolean) {
 				Page(page: $page, perPage: $perPage) {
+					pageInfo {
+						currentPage
+						hasNextPage
+					}
 					notifications(resetNotificationCount: $resetNotificationCount) {
 						... on AiringNotification {
 							id type animeId episode createdAt
@@ -291,16 +301,69 @@ function init() {
 			}
 		`;
 
-		async function fetchNotifications(resetNotificationCount = false) {
-			if (loading.get()) return;
+		const NOTIFICATIONS_PER_PAGE = 50;
+		const loadingActivityIds = new Set<number>();
+
+		function notificationGlobalIndex(page: number, index: number): number {
+			return Math.max(0, (Number(page || 1) - 1) * NOTIFICATIONS_PER_PAGE + index);
+		}
+
+		function shouldPrefetchActivityDetail(item: AniListNotification): boolean {
+			if (!item || !item.activityId) return false;
+			const type = String(item.type || "");
+			if (type.indexOf("ACTIVITY_") !== 0) return false;
+			if (!item.activity) return true;
+			if (!item.activity.siteUrl) return true;
+			if ((type === "ACTIVITY_REPLY" || type === "ACTIVITY_REPLY_SUBSCRIBED" || type === "ACTIVITY_REPLY_LIKE") && !Array.isArray(item.activity.replies)) return true;
+			if ((item.activity.status || item.activity.progress) && !item.activity.media) return true;
+			if (type === "ACTIVITY_LIKE" && !item.activity.media && !item.activity.text && !item.activity.message) return true;
+			if (type.indexOf("LIKE") !== -1 && !item.activity.media && !item.activity.text && !item.activity.message) return true;
+			return false;
+		}
+
+		function mergeNotifications(existing: AniListNotification[], incoming: AniListNotification[]) {
+			const byId = new Map<number, AniListNotification>();
+			for (const item of existing) byId.set(Number(item.id), item);
+
+			for (const item of incoming) {
+				const id = Number(item.id);
+				const current = byId.get(id);
+				byId.set(id, current ? {
+					...item,
+					activity: {
+						...(item.activity || {}),
+						...(current.activity || {}),
+					},
+					unread: current.unread,
+				} : item);
+			}
+
+			return Array.from(byId.values()).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+		}
+
+		function prefetchActivityDetails(items: AniListNotification[]) {
+			for (const item of items) {
+				const id = Number(item.activityId || 0);
+				if (!id || loadingActivityIds.has(id) || !shouldPrefetchActivityDetail(item)) continue;
+				loadingActivityIds.add(id);
+				loadActivityDetail(id, true).finally(() => loadingActivityIds.delete(id));
+			}
+		}
+
+		async function fetchNotifications(resetNotificationCount = false, page = 1, append = false) {
+			if (append ? loadingMore.get() : loading.get()) return;
 
 			try {
-				loading.set(true);
+				if (append) {
+					loadingMore.set(true);
+				} else {
+					loading.set(true);
+				}
 				error.set(null);
 
 				const data = await anilistFetch(GET_NOTIFICATIONS, {
-					page: 1,
-					perPage: 50,
+					page,
+					perPage: NOTIFICATIONS_PER_PAGE,
 					resetNotificationCount,
 				});
 
@@ -311,20 +374,28 @@ function init() {
 					...item,
 					viewerId,
 					viewerName,
-					unread: index < unread,
+					unread: notificationGlobalIndex(page, index) < unread,
 				}));
+				const pageInfo = data?.Page?.pageInfo || {};
 
-				notifications.set(items);
+				notifications.set(append ? mergeNotifications(notifications.get(), items) : items);
 				unreadCount.set(unread);
+				hasNextPage.set(!!pageInfo.hasNextPage);
+				currentPage.set(Number(pageInfo.currentPage || page || 1));
 				lastUpdated.set(new Date().toLocaleString());
+				prefetchActivityDetails(items);
 			} catch (err: any) {
 				error.set(err?.message || "Failed to fetch AniList notifications");
 			} finally {
-				loading.set(false);
+				if (append) {
+					loadingMore.set(false);
+				} else {
+					loading.set(false);
+				}
 			}
 		}
 
-		async function loadActivityDetail(activityId: number) {
+		async function loadActivityDetail(activityId: number, quiet = false) {
 			const id = Number(activityId || 0);
 			if (!id) return;
 
@@ -345,7 +416,7 @@ function init() {
 					};
 				}));
 			} catch (err: any) {
-				error.set(err?.message || "Failed to load AniList activity details");
+				if (!quiet) error.set(err?.message || "Failed to load AniList activity details");
 			}
 		}
 
@@ -382,6 +453,10 @@ function init() {
 
 		webview.channel.on("refresh", () => fetchNotifications(false));
 		webview.channel.on("mark-all-read", () => fetchNotifications(true));
+		webview.channel.on("load-more", () => {
+			if (!hasNextPage.get()) return;
+			fetchNotifications(false, currentPage.get() + 1, true);
+		});
 		webview.channel.on("mark-read-local", (id: number) => markLocalRead(Number(id)));
 		webview.channel.on("load-activity-detail", (activityId: number) => loadActivityDetail(Number(activityId)));
 		webview.channel.on("open-url", (url: string) => openAniListUrl(url));
@@ -684,6 +759,11 @@ function init() {
 						margin-top: 9px;
 					}
 
+					.card-rich.media-only {
+						width: fit-content;
+						max-width: 100%;
+					}
+
 					.card-rich:empty,
 					.rich-content:empty,
 					.rich-media:empty {
@@ -857,6 +937,15 @@ function init() {
 						background: rgba(15, 23, 42, 0.34);
 					}
 
+					.content-box.media-only {
+						display: inline-block;
+						width: auto;
+						max-width: 100%;
+						padding: 0;
+						border: 0;
+						background: transparent;
+					}
+
 					.content-box .detail-label {
 						margin-bottom: 8px;
 					}
@@ -866,10 +955,30 @@ function init() {
 						background: rgba(2, 169, 255, 0.12);
 					}
 
+					.content-box.media-only .detail-label {
+						display: none;
+					}
+
+					.content-box.media-only .quote,
+					.quote.media-only {
+						display: inline-block;
+						width: auto;
+						max-width: 100%;
+						padding: 0;
+						border-left: 0;
+						background: transparent;
+					}
+
 					.rich-content {
 						display: flex;
 						flex-direction: column;
 						gap: 10px;
+					}
+
+					.rich-content.media-only {
+						align-items: flex-start;
+						width: fit-content;
+						max-width: 100%;
 					}
 
 					.rich-content-text {
@@ -882,6 +991,7 @@ function init() {
 						align-self: flex-start;
 						width: auto;
 						max-width: 100%;
+						flex: 0 1 auto;
 						line-height: 0;
 						box-sizing: border-box;
 						overflow: hidden;
@@ -995,6 +1105,12 @@ function init() {
 						padding: 0 20px 20px;
 					}
 
+					.load-more-row {
+						display: flex;
+						justify-content: center;
+						padding: 6px 0 2px;
+					}
+
 					.hidden {
 						display: none !important;
 					}
@@ -1062,6 +1178,9 @@ function init() {
 							notifications: [],
 							unreadCount: 0,
 							loading: false,
+							loadingMore: false,
+							hasNextPage: false,
+							currentPage: 1,
 							error: null,
 							lastUpdated: "",
 							selectedId: null
@@ -1196,8 +1315,11 @@ function init() {
 						function appendRichContent(parent, value) {
 							var parts = richTextParts(value);
 							if (!parts.length) return false;
+							var mediaOnly = parts.every(function(part) { return part.type === 'media'; });
+							if (mediaOnly && parent.classList) parent.classList.add('media-only');
 
 							var wrap = create('div', 'rich-content');
+							if (mediaOnly) wrap.classList.add('media-only');
 							parts.forEach(function(part) {
 								if (part.type === 'media') {
 									var frame = create('div', 'rich-media');
@@ -1816,7 +1938,9 @@ function init() {
 								var key = normalizeText(block.text);
 								if (!key || seen[key]) return;
 								seen[key] = true;
+								var mediaOnly = richTextParts(block.text).every(function(part) { return part.type === 'media'; });
 								var box = create('div', 'content-box');
+								if (mediaOnly) box.classList.add('media-only');
 								box.appendChild(create('div', 'detail-label', block.label));
 								var quote = create('div', 'quote');
 								appendRichContent(quote, block.text);
@@ -1854,6 +1978,7 @@ function init() {
 							if (introText && introHasMedia) {
 								var introBox = create('div', 'content-box');
 								var introQuote = create('div', 'quote');
+								if (richTextParts(introText).every(function(part) { return part.type === 'media'; })) introBox.classList.add('media-only');
 								if (appendRichContent(introQuote, introText)) {
 									introBox.appendChild(introQuote);
 									content.appendChild(introBox);
@@ -1955,6 +2080,18 @@ function init() {
 								}
 							});
 							root.appendChild(list);
+
+							if (state.hasNextPage) {
+								var moreRow = create('div', 'load-more-row');
+								var more = create('button', 'btn btn-primary');
+								more.type = 'button';
+								more.disabled = !!state.loadingMore;
+								more.appendChild(iconNode(state.loadingMore ? 'refresh' : 'chevron'));
+								more.appendChild(document.createTextNode(state.loadingMore ? 'Loading more' : 'Show more'));
+								more.onclick = function() { send('load-more'); };
+								moreRow.appendChild(more);
+								root.appendChild(moreRow);
+							}
 						}
 
 						function bindWebview() {
@@ -1974,6 +2111,18 @@ function init() {
 							});
 							window.webview.on('loading', function(value) {
 								state.loading = !!value;
+								render();
+							});
+							window.webview.on('loadingMore', function(value) {
+								state.loadingMore = !!value;
+								render();
+							});
+							window.webview.on('hasNextPage', function(value) {
+								state.hasNextPage = !!value;
+								render();
+							});
+							window.webview.on('currentPage', function(value) {
+								state.currentPage = Number(value || 1);
 								render();
 							});
 							window.webview.on('error', function(value) {

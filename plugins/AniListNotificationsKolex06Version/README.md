@@ -18,6 +18,11 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.7
+- Prefetches activity details in the background so anime/media boxes can appear before opening a popup.
+- Adds a bottom "Show more" button to load older notifications.
+- Shrinks media-only popup/content wrappers so image, gif, and video embeds fit more tightly.
+
 ### 1.0.6
 - Makes the image/gif/video embed border fit tightly around the media instead of stretching across the text area.
 
