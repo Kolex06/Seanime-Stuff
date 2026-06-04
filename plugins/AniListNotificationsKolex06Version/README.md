@@ -18,6 +18,11 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.2
+- Keeps the sender/user avatar on the left side of opened notification details.
+- Shows anime and manga covers inside the media box instead of replacing the sender avatar.
+- Adds consistent text boxes for replies, messages, thread comments, liked content, activity text, and reasons.
+
 ### 1.0.1
 - Removes repeated liked text, repeated media titles, and duplicate media action buttons from the notification popup.
 - Keeps watched episode/progress info in the media block and AniList links in the bottom action row.

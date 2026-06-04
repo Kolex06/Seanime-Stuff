@@ -820,6 +820,23 @@ function init() {
 						white-space: pre-wrap;
 					}
 
+					.content-box {
+						margin: 14px 0;
+						padding: 12px;
+						border: 1px solid rgba(125, 211, 252, 0.26);
+						border-radius: 8px;
+						background: rgba(15, 23, 42, 0.34);
+					}
+
+					.content-box .detail-label {
+						margin-bottom: 8px;
+					}
+
+					.content-box .quote {
+						margin: 0;
+						background: rgba(2, 169, 255, 0.12);
+					}
+
 					.liked-media {
 						display: grid;
 						grid-template-columns: 72px minmax(0, 1fr);
@@ -1076,25 +1093,45 @@ function init() {
 
 						function matchedReply(item) {
 							if (!item || !item.activity || !Array.isArray(item.activity.replies)) return null;
+							var replies = item.activity.replies.slice().sort(function(a, b) {
+								return Number(b && b.createdAt || 0) - Number(a && a.createdAt || 0);
+							});
 							if (item.replyId) {
 								var replyId = Number(item.replyId);
-								return item.activity.replies.find(function(reply) {
+								return replies.find(function(reply) {
 									return Number(reply && reply.id) === replyId;
 								}) || null;
 							}
 							if (item.type === 'ACTIVITY_REPLY_LIKE' && item.viewerId) {
 								var viewerId = Number(item.viewerId);
-								return item.activity.replies.find(function(reply) {
+								return replies.find(function(reply) {
 									return Number(reply && reply.user && reply.user.id) === viewerId;
 								}) || null;
 							}
 							if (item.type === 'ACTIVITY_REPLY_LIKE' && item.viewerName) {
 								var viewerName = String(item.viewerName).toLowerCase();
-								return item.activity.replies.find(function(reply) {
+								return replies.find(function(reply) {
 									return String(reply && reply.user && reply.user.name || '').toLowerCase() === viewerName;
 								}) || null;
 							}
+							if ((item.type === 'ACTIVITY_REPLY' || item.type === 'ACTIVITY_REPLY_SUBSCRIBED') && item.userId) {
+								var userId = Number(item.userId);
+								return replies.find(function(reply) {
+									return Number(reply && reply.user && reply.user.id) === userId;
+								}) || null;
+							}
+							if ((item.type === 'ACTIVITY_REPLY' || item.type === 'ACTIVITY_REPLY_SUBSCRIBED') && item.user && item.user.name) {
+								var userName = String(item.user.name).toLowerCase();
+								return replies.find(function(reply) {
+									return String(reply && reply.user && reply.user.name || '').toLowerCase() === userName;
+								}) || null;
+							}
 							return null;
+						}
+
+						function replyText(item) {
+							var reply = matchedReply(item);
+							return stripHtml(reply && reply.text);
 						}
 
 						function likedContent(item) {
@@ -1292,6 +1329,7 @@ function init() {
 							var type = String(item.type || '');
 							if (type.indexOf('ACTIVITY_') !== 0) return false;
 							if (!item.activity) return true;
+							if ((type === 'ACTIVITY_REPLY' || type === 'ACTIVITY_REPLY_SUBSCRIBED') && !Array.isArray(item.activity.replies)) return true;
 							if (type === 'ACTIVITY_REPLY_LIKE' && !Array.isArray(item.activity.replies)) return true;
 							if (type.indexOf('LIKE') !== -1 && !item.activity.siteUrl) return true;
 							if (type === 'ACTIVITY_LIKE' && !item.activity.media && !item.activity.text && !item.activity.message) return true;
@@ -1307,11 +1345,20 @@ function init() {
 							return status || progress;
 						}
 
-						function imageFor(item) {
+						function avatarFor(item) {
+							return item && item.user && item.user.avatar ? item.user.avatar.large || item.user.avatar.medium : '';
+						}
+
+						function mediaCoverFor(item) {
 							var media = itemMedia(item);
-							var cover = media && media.coverImage ? media.coverImage.large || media.coverImage.medium : '';
-							var avatar = item.user && item.user.avatar ? item.user.avatar.large || item.user.avatar.medium : '';
-							return cover || avatar || '';
+							return media && media.coverImage ? media.coverImage.large || media.coverImage.medium : '';
+						}
+
+						function imageFor(item) {
+							var avatar = avatarFor(item);
+							if (avatar) return avatar;
+							if (item && item.user) return '';
+							return mediaCoverFor(item);
 						}
 
 						function initialsFor(item) {
@@ -1392,7 +1439,7 @@ function init() {
 
 						function renderThumb(parent, item, large) {
 							var image = imageFor(item);
-							var thumb = create('div', 'thumb' + ((itemMedia(item) || large) ? ' media' : ''));
+							var thumb = create('div', 'thumb' + ((!item.user && (itemMedia(item) || large)) ? ' media' : ''));
 							if (image) {
 								var img = document.createElement('img');
 								img.src = image;
@@ -1426,10 +1473,11 @@ function init() {
 
 							var copy = create('div');
 							var typeLabel = media.type === 'MANGA' ? 'Manga' : 'Anime';
+							var owner = activityOwner(item.activity);
 							if (item.activity && item.activity.media && String(item.type || '').includes('LIKE')) {
-								typeLabel += ' from liked activity';
+								typeLabel += owner ? ' from @' + owner : ' from liked activity';
 							} else if (item.activity && item.activity.media) {
-								typeLabel += ' from activity';
+								typeLabel += owner ? ' from @' + owner : ' from activity';
 							}
 							copy.appendChild(create('div', 'liked-media-kicker', typeLabel));
 							copy.appendChild(create('h3', 'liked-media-title', title));
@@ -1517,6 +1565,80 @@ function init() {
 							return box;
 						}
 
+						function addTextBlock(blocks, label, value) {
+							var text = stripHtml(value);
+							if (!text) return;
+							blocks.push({ label: label, text: text });
+						}
+
+						function textBlocksFor(item, reply) {
+							var blocks = [];
+							var type = String(item.type || '');
+							var activityText = stripHtml(item.activity && (item.activity.text || item.activity.message));
+							var messageText = stripHtml(item.message && item.message.message);
+							var commentText = stripHtml(item.comment && item.comment.comment);
+							var replyTextValue = stripHtml(reply && reply.text);
+							var likedText = likedContent(item);
+
+							if (type === 'ACTIVITY_MESSAGE') {
+								addTextBlock(blocks, 'Message', messageText || activityText);
+							}
+
+							if (type === 'ACTIVITY_REPLY' || type === 'ACTIVITY_REPLY_SUBSCRIBED') {
+								addTextBlock(blocks, 'Reply', replyTextValue);
+								addTextBlock(blocks, 'Activity', activityText);
+							}
+
+							if (type === 'ACTIVITY_MENTION') {
+								addTextBlock(blocks, 'Mentioned activity', activityText);
+							}
+
+							if (type === 'ACTIVITY_LIKE') {
+								addTextBlock(blocks, likedContentLabel(item), likedText || activityText);
+							}
+
+							if (type === 'ACTIVITY_REPLY_LIKE') {
+								addTextBlock(blocks, likedContentLabel(item), likedText || replyTextValue);
+								addTextBlock(blocks, 'Activity', activityText);
+							}
+
+							if (type === 'THREAD_COMMENT_MENTION' || type === 'THREAD_COMMENT_REPLY' || type === 'THREAD_COMMENT_SUBSCRIBED') {
+								addTextBlock(blocks, 'Thread comment', commentText);
+							}
+
+							if (type === 'THREAD_COMMENT_LIKE') {
+								addTextBlock(blocks, likedContentLabel(item), likedText || commentText);
+							}
+
+							if (type === 'THREAD_LIKE') {
+								addTextBlock(blocks, likedContentLabel(item), likedText);
+							}
+
+							if (type.indexOf('MEDIA_') === 0 || type === 'RELATED_MEDIA_ADDITION') {
+								addTextBlock(blocks, 'Reason', item.reason);
+							}
+
+							if (!blocks.length) {
+								addTextBlock(blocks, 'Details', messageText || replyTextValue || commentText || activityText || item.reason);
+							}
+
+							return blocks;
+						}
+
+						function renderTextBoxes(parent, item, reply, introText) {
+							var seen = {};
+							if (introText) seen[normalizeText(introText)] = true;
+							textBlocksFor(item, reply).forEach(function(block) {
+								var key = normalizeText(block.text);
+								if (!key || seen[key]) return;
+								seen[key] = true;
+								var box = create('div', 'content-box');
+								box.appendChild(create('div', 'detail-label', block.label));
+								box.appendChild(create('div', 'quote', block.text));
+								parent.appendChild(box);
+							});
+						}
+
 						function renderDetailSheet(list, item) {
 							var sheet = create('div', 'detail-sheet');
 							var head = create('div', 'detail-sheet-head');
@@ -1546,6 +1668,7 @@ function init() {
 							var commentLikeCount = item.comment && item.comment.likeCount;
 							var replyLikeCount = reply && reply.likeCount;
 							renderLikedMedia(content, item);
+							renderTextBoxes(content, item, reply, introText);
 
 							var grid = create('div', 'detail-grid');
 							var shownMediaTitle = mediaTitle(itemMedia(item));
@@ -1571,20 +1694,6 @@ function init() {
 
 							details.forEach(function(node) { grid.appendChild(node); });
 							if (details.length) content.appendChild(grid);
-
-							var likedText = likedContent(item);
-							if (likedText) {
-								content.appendChild(create('div', 'detail-label', likedContentLabel(item)));
-								content.appendChild(create('div', 'quote', likedText));
-							}
-
-							var quoteText = stripHtml((item.message && item.message.message) || (item.activity && (item.activity.text || item.activity.message)) || (item.comment && item.comment.comment));
-							if (quoteText) {
-								if (!sameText(quoteText, likedText) && !sameText(quoteText, introText)) {
-									content.appendChild(create('div', 'detail-label', 'Context'));
-									content.appendChild(create('div', 'quote', quoteText));
-								}
-							}
 
 							renderAllAniListData(content, item);
 							body.appendChild(content);
