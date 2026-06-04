@@ -1,7 +1,7 @@
 {
   "id": "AniList-Notifications-Kolex06-Version",
   "name": "AniList Notifications Kolex06-Version",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AniList-Notifications-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",

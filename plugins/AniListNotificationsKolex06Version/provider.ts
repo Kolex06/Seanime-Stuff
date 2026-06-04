@@ -1631,6 +1631,10 @@ function init() {
 							return 'Open this notification for details and the AniList page link.';
 						}
 
+						function isFallbackNotificationText(value) {
+							return sameText(value, 'Open this notification for details and the AniList page link.');
+						}
+
 						function popupIntroText(item) {
 							var type = String(item.type || '');
 							var title = notificationTitle(item);
@@ -1643,7 +1647,7 @@ function init() {
 								return '';
 							}
 
-							if (!text || sameText(text, title) || sameText(text, liked)) return '';
+							if (!text || isFallbackNotificationText(text) || sameText(text, title) || sameText(text, liked)) return '';
 							return text;
 						}
 
