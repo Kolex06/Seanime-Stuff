@@ -1,7 +1,7 @@
 {
   "id": "AniList-Notifications-Kolex06-Version",
   "name": "AniList Notifications Kolex06-Version",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AniList-Notifications-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
@@ -28,9 +28,9 @@
             "graphql.anilist.co",
             "anilist.co",
             "s4.anilist.co",
-            "64.media.tumblr.com"
+            "*"
           ],
-          "reasoning": "Required to read the signed-in user's AniList notifications and display AniList cover/avatar/user-embedded images."
+          "reasoning": "Required to read the signed-in user's AniList notifications and display AniList cover/avatar images plus user-embedded images and gifs from different hosts."
         },
         "commandScopes": [
           {

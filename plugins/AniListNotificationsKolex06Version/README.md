@@ -18,6 +18,11 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.4
+- Shows AniList image/gif/video embeds in the normal notification card preview as well as the popup.
+- Hides broken or blocked embeds cleanly instead of leaving raw `img99999(...)` text behind.
+- Allows user-embedded notification media from different hosts instead of one Tumblr media subdomain.
+
 ### 1.0.3
 - Renders AniList-style image markup such as `img99999(...)` inside notification text boxes.
 - Shows `.gifv` embeds with an animated image fallback and video fallback.

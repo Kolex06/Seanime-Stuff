@@ -680,6 +680,35 @@ function init() {
 						font-size: 1.04rem;
 					}
 
+					.card-rich {
+						margin-top: 9px;
+					}
+
+					.card-rich:empty,
+					.rich-content:empty,
+					.rich-media:empty {
+						display: none;
+					}
+
+					.card-rich .rich-content {
+						gap: 8px;
+					}
+
+					.card-rich .rich-content-text {
+						display: -webkit-box;
+						-webkit-line-clamp: 3;
+						-webkit-box-orient: vertical;
+						overflow: hidden;
+						color: var(--muted);
+						font-size: 1.04rem;
+					}
+
+					.card-rich .rich-media img,
+					.card-rich .rich-media video {
+						max-width: min(100%, 340px);
+						max-height: 210px;
+					}
+
 					.media-pill {
 						display: inline-flex;
 						align-items: center;
@@ -855,6 +884,7 @@ function init() {
 						border: 1px solid rgba(125, 211, 252, 0.24);
 						border-radius: 8px;
 						background: rgba(15, 23, 42, 0.45);
+						box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
 					}
 
 					.rich-media img,
@@ -1085,6 +1115,17 @@ function init() {
 							return String(url || '').replace(/\\.gifv(?=($|[?#]))/i, '.gif');
 						}
 
+						function isVideoEmbedUrl(url) {
+							return /\\.(?:mp4|webm|mov|m4v|ogv)(?:$|[?#])/i.test(String(url || ''));
+						}
+
+						function pushMediaPart(parts, seenMedia, value) {
+							var safe = safeMediaEmbedUrl(value);
+							if (!safe || seenMedia[safe]) return;
+							seenMedia[safe] = true;
+							parts.push({ type: 'media', url: safe });
+						}
+
 						function richTextParts(value) {
 							var html = String(value || '');
 							var imageUrls = [];
@@ -1093,17 +1134,22 @@ function init() {
 								if (safe) imageUrls.push(safe);
 								return '';
 							});
+							html.replace(/<(?:video|source)\\b[^>]*\\bsrc=["']?([^"'\\s>]+)["']?[^>]*>/ig, function(_, url) {
+								var safe = safeMediaEmbedUrl(url);
+								if (safe) imageUrls.push(safe);
+								return '';
+							});
 
 							var text = stripHtml(html);
 							var parts = [];
-							var pattern = new RegExp('img\\\\d*\\\\((https?:\\\\/\\\\/[^)\\\\s]+)\\\\)|!\\\\[[^\\\\]]*\\\\]\\\\((https?:\\\\/\\\\/[^)\\\\s]+)\\\\)|(https?:\\\\/\\\\/[^\\\\s)]+\\\\.(?:png|jpe?g|gif|gifv|webp|avif)(?:\\\\?[^\\\\s)]*)?)', 'ig');
+							var seenMedia = {};
+							var pattern = new RegExp('(?:img|image|ing)\\\\d*\\\\(\\\\s*([^)]+?)\\\\s*\\\\)|!\\\\[[^\\\\]]*\\\\]\\\\(\\\\s*([^)]+?)\\\\s*\\\\)|(https?:\\\\/\\\\/[^\\\\s)]+\\\\.(?:png|apng|jpe?g|gif|gifv|webp|avif|svg|bmp|mp4|webm|mov|m4v|ogv)(?:\\\\?[^\\\\s)]*)?)', 'ig');
 							var lastIndex = 0;
 							var match;
 							while ((match = pattern.exec(text)) !== null) {
 								var before = text.slice(lastIndex, match.index);
 								if (before.trim()) parts.push({ type: 'text', text: before.trim() });
-								var safeUrl = safeMediaEmbedUrl(match[1] || match[2] || match[3]);
-								if (safeUrl) parts.push({ type: 'media', url: safeUrl });
+								pushMediaPart(parts, seenMedia, match[1] || match[2] || match[3]);
 								lastIndex = pattern.lastIndex;
 							}
 
@@ -1111,10 +1157,32 @@ function init() {
 							if (after.trim()) parts.push({ type: 'text', text: after.trim() });
 
 							imageUrls.forEach(function(url) {
-								parts.push({ type: 'media', url: url });
+								pushMediaPart(parts, seenMedia, url);
 							});
 
 							return parts;
+						}
+
+						function removeRichMedia(frame, wrap) {
+							if (frame && frame.parentNode) frame.parentNode.removeChild(frame);
+							if (wrap && !wrap.textContent.trim() && !wrap.querySelector('img, video')) {
+								if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+							}
+						}
+
+						function appendVideoEmbed(frame, wrap, url) {
+							var video = document.createElement('video');
+							video.src = url;
+							video.autoplay = true;
+							video.loop = true;
+							video.muted = true;
+							video.playsInline = true;
+							video.setAttribute('playsinline', '');
+							video.onerror = function() {
+								removeRichMedia(frame, wrap);
+							};
+							frame.textContent = '';
+							frame.appendChild(video);
 						}
 
 						function appendRichContent(parent, value) {
@@ -1125,22 +1193,23 @@ function init() {
 							parts.forEach(function(part) {
 								if (part.type === 'media') {
 									var frame = create('div', 'rich-media');
-									var img = document.createElement('img');
-									img.src = imageUrlForDisplay(part.url);
-									img.alt = '';
-									if (/\\.gifv(?:$|[?#])/i.test(part.url)) {
+									if (isVideoEmbedUrl(part.url)) {
+										appendVideoEmbed(frame, wrap, part.url);
+									} else {
+										var img = document.createElement('img');
+										img.src = imageUrlForDisplay(part.url);
+										img.alt = '';
+										img.loading = 'lazy';
+										img.decoding = 'async';
 										img.onerror = function() {
-											var video = document.createElement('video');
-											video.src = part.url;
-											video.autoplay = true;
-											video.loop = true;
-											video.muted = true;
-											video.playsInline = true;
-											frame.textContent = '';
-											frame.appendChild(video);
+											if (/\\.gifv(?:$|[?#])/i.test(part.url)) {
+												appendVideoEmbed(frame, wrap, part.url);
+												return;
+											}
+											removeRichMedia(frame, wrap);
 										};
+										frame.appendChild(img);
 									}
-									frame.appendChild(img);
 									wrap.appendChild(frame);
 								} else {
 									wrap.appendChild(create('div', 'rich-content-text', part.text));
@@ -1639,7 +1708,10 @@ function init() {
 
 							main.appendChild(meta);
 							main.appendChild(create('h2', 'card-title', notificationTitle(item)));
-							main.appendChild(create('p', 'card-text', notificationText(item)));
+							var preview = create('div', 'card-rich');
+							if (appendRichContent(preview, notificationText(item))) {
+								main.appendChild(preview);
+							}
 
 							var media = mediaTitle(item.media) || mediaTitle(item.activity && item.activity.media);
 							if (media) {
@@ -1670,48 +1742,48 @@ function init() {
 						}
 
 						function addTextBlock(blocks, label, value) {
-							var text = stripHtml(value);
-							if (!text) return;
-							blocks.push({ label: label, text: text });
+							if (!value) return;
+							if (!richTextParts(value).length) return;
+							blocks.push({ label: label, text: String(value) });
 						}
 
 						function textBlocksFor(item, reply) {
 							var blocks = [];
 							var type = String(item.type || '');
-							var activityText = stripHtml(item.activity && (item.activity.text || item.activity.message));
-							var messageText = stripHtml(item.message && item.message.message);
-							var commentText = stripHtml(item.comment && item.comment.comment);
-							var replyTextValue = stripHtml(reply && reply.text);
+							var activityValue = item.activity && (item.activity.text || item.activity.message);
+							var messageValue = item.message && item.message.message;
+							var commentValue = item.comment && item.comment.comment;
+							var replyValue = reply && reply.text;
 							var likedText = likedContent(item);
 
 							if (type === 'ACTIVITY_MESSAGE') {
-								addTextBlock(blocks, 'Message', messageText || activityText);
+								addTextBlock(blocks, 'Message', messageValue || activityValue);
 							}
 
 							if (type === 'ACTIVITY_REPLY' || type === 'ACTIVITY_REPLY_SUBSCRIBED') {
-								addTextBlock(blocks, 'Reply', replyTextValue);
-								addTextBlock(blocks, 'Activity', activityText);
+								addTextBlock(blocks, 'Reply', replyValue);
+								addTextBlock(blocks, 'Activity', activityValue);
 							}
 
 							if (type === 'ACTIVITY_MENTION') {
-								addTextBlock(blocks, 'Mentioned activity', activityText);
+								addTextBlock(blocks, 'Mentioned activity', activityValue);
 							}
 
 							if (type === 'ACTIVITY_LIKE') {
-								addTextBlock(blocks, likedContentLabel(item), likedText || activityText);
+								addTextBlock(blocks, likedContentLabel(item), likedText || activityValue);
 							}
 
 							if (type === 'ACTIVITY_REPLY_LIKE') {
-								addTextBlock(blocks, likedContentLabel(item), likedText || replyTextValue);
-								addTextBlock(blocks, 'Activity', activityText);
+								addTextBlock(blocks, likedContentLabel(item), likedText || replyValue);
+								addTextBlock(blocks, 'Activity', activityValue);
 							}
 
 							if (type === 'THREAD_COMMENT_MENTION' || type === 'THREAD_COMMENT_REPLY' || type === 'THREAD_COMMENT_SUBSCRIBED') {
-								addTextBlock(blocks, 'Thread comment', commentText);
+								addTextBlock(blocks, 'Thread comment', commentValue);
 							}
 
 							if (type === 'THREAD_COMMENT_LIKE') {
-								addTextBlock(blocks, likedContentLabel(item), likedText || commentText);
+								addTextBlock(blocks, likedContentLabel(item), likedText || commentValue);
 							}
 
 							if (type === 'THREAD_LIKE') {
@@ -1723,7 +1795,7 @@ function init() {
 							}
 
 							if (!blocks.length) {
-								addTextBlock(blocks, 'Details', messageText || replyTextValue || commentText || activityText || item.reason);
+								addTextBlock(blocks, 'Details', messageValue || replyValue || commentValue || activityValue || item.reason);
 							}
 
 							return blocks;
@@ -1771,7 +1843,14 @@ function init() {
 							var introText = popupIntroText(item);
 							var introHasMedia = richTextParts(introText).some(function(part) { return part.type === 'media'; });
 							if (introText && !introHasMedia) content.appendChild(create('p', 'detail-sheet-text', introText));
-							if (introHasMedia) introText = '';
+							if (introText && introHasMedia) {
+								var introBox = create('div', 'content-box');
+								var introQuote = create('div', 'quote');
+								if (appendRichContent(introQuote, introText)) {
+									introBox.appendChild(introQuote);
+									content.appendChild(introBox);
+								}
+							}
 							var reply = matchedReply(item);
 							var commentLikeCount = item.comment && item.comment.likeCount;
 							var replyLikeCount = reply && reply.likeCount;
