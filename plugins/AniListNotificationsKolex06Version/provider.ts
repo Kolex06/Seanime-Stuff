@@ -1102,6 +1102,8 @@ function init() {
 
 						function safeMediaEmbedUrl(value) {
 							var url = String(value || '').trim().replace(/^<|>$/g, '');
+							if (/^\\/\\//.test(url)) url = 'https:' + url;
+							if (!/^https?:\\/\\//i.test(url)) return '';
 							try {
 								var parsed = new URL(url, window.location.href);
 								if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';

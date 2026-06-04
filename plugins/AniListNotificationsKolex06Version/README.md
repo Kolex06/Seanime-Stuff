@@ -18,6 +18,9 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.5
+- Only attempts real `http`/`https` user embeds and strips bad AniList image markup cleanly.
+
 ### 1.0.4
 - Shows AniList image/gif/video embeds in the normal notification card preview as well as the popup.
 - Hides broken or blocked embeds cleanly instead of leaving raw `img99999(...)` text behind.
