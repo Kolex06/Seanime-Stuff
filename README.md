@@ -19,7 +19,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 | Extension | Version | ID | Description |
 | --- | --- | --- | --- |
 | SeaUtils Kolex06-Version | 1.2.68 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
-| AniList Notifications Kolex06-Version | 1.0.9 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
+| AniList Notifications Kolex06-Version | 1.0.10 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
 | AsunaTracks Sync | 0.1.21 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version

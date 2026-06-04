@@ -18,6 +18,9 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.10
+- Removes the `Liked activity:` style prefix from liked notification preview text.
+
 ### 1.0.9
 - Removes all `setTimeout`/timer usage from the provider and webview script.
 - Uses a small async/await detail prefetch pass after refresh instead of a delayed queue.

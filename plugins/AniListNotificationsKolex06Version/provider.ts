@@ -1621,9 +1621,9 @@ function init() {
 							var messageText = stripHtml(item.message && item.message.message);
 							var reason = stripHtml(item.reason);
 
-							if (liked && String(item.type || '').includes('LIKE')) return likedContentLabel(item) + ': ' + liked;
+							if (liked && String(item.type || '').includes('LIKE')) return liked;
 							if (context) return context;
-							if (liked) return likedContentLabel(item) + ': ' + liked;
+							if (liked) return liked;
 							if (messageText) return messageText;
 							if (activityText) return activityText;
 							if (reason) return 'Reason: ' + reason;
