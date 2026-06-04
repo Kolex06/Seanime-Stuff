@@ -339,11 +339,8 @@ function init() {
 
 		const NOTIFICATIONS_PER_PAGE = 25;
 		const PREFETCH_DETAIL_LIMIT = 4;
-		const PREFETCH_DETAIL_DELAY_MS = 2600;
 		const loadingActivityIds = new Set<number>();
 		const prefetchedActivityIds = new Set<number>();
-		const activityDetailQueue: number[] = [];
-		let activityDetailTimer: any = null;
 
 		function notificationGlobalIndex(page: number, index: number): number {
 			return Math.max(0, (Number(page || 1) - 1) * NOTIFICATIONS_PER_PAGE + index);
@@ -360,40 +357,6 @@ function init() {
 			if (type === "ACTIVITY_LIKE" && !item.activity.media && !item.activity.text && !item.activity.message) return true;
 			if (type.indexOf("LIKE") !== -1 && !item.activity.media && !item.activity.text && !item.activity.message) return true;
 			return false;
-		}
-
-		function stopActivityPrefetchQueue() {
-			activityDetailQueue.length = 0;
-			if (activityDetailTimer) {
-				clearTimeout(activityDetailTimer);
-				activityDetailTimer = null;
-			}
-		}
-
-		function scheduleActivityPrefetch() {
-			if (activityDetailTimer || !activityDetailQueue.length || isAniListRateLimited()) return;
-			activityDetailTimer = setTimeout(async () => {
-				activityDetailTimer = null;
-				if (isAniListRateLimited()) {
-					stopActivityPrefetchQueue();
-					return;
-				}
-
-				const id = activityDetailQueue.shift();
-				if (!id || loadingActivityIds.has(id) || prefetchedActivityIds.has(id)) {
-					scheduleActivityPrefetch();
-					return;
-				}
-
-				loadingActivityIds.add(id);
-				try {
-					await loadActivityDetail(id, true);
-					prefetchedActivityIds.add(id);
-				} finally {
-					loadingActivityIds.delete(id);
-					scheduleActivityPrefetch();
-				}
-			}, PREFETCH_DETAIL_DELAY_MS);
 		}
 
 		function mergeNotifications(existing: AniListNotification[], incoming: AniListNotification[]) {
@@ -416,17 +379,24 @@ function init() {
 			return Array.from(byId.values()).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 		}
 
-		function prefetchActivityDetails(items: AniListNotification[]) {
+		async function prefetchActivityDetails(items: AniListNotification[]) {
 			if (isAniListRateLimited()) return;
-			let added = 0;
+			let loaded = 0;
 			for (const item of items) {
 				const id = Number(item.activityId || 0);
-				if (!id || loadingActivityIds.has(id) || prefetchedActivityIds.has(id) || activityDetailQueue.includes(id) || !shouldPrefetchActivityDetail(item)) continue;
-				activityDetailQueue.push(id);
-				added += 1;
-				if (added >= PREFETCH_DETAIL_LIMIT) break;
+				if (!id || loadingActivityIds.has(id) || prefetchedActivityIds.has(id) || !shouldPrefetchActivityDetail(item)) continue;
+
+				loadingActivityIds.add(id);
+				try {
+					await loadActivityDetail(id, true);
+					prefetchedActivityIds.add(id);
+				} finally {
+					loadingActivityIds.delete(id);
+				}
+
+				loaded += 1;
+				if (loaded >= PREFETCH_DETAIL_LIMIT || isAniListRateLimited()) break;
 			}
-			scheduleActivityPrefetch();
 		}
 
 		async function fetchNotifications(resetNotificationCount = false, page = 1, append = false) {
@@ -437,7 +407,6 @@ function init() {
 			}
 
 			try {
-				if (!append) stopActivityPrefetchQueue();
 				if (append) {
 					loadingMore.set(true);
 				} else {
@@ -467,7 +436,7 @@ function init() {
 				hasNextPage.set(!!pageInfo.hasNextPage);
 				currentPage.set(Number(pageInfo.currentPage || page || 1));
 				lastUpdated.set(new Date().toLocaleString());
-				prefetchActivityDetails(items);
+				void prefetchActivityDetails(items);
 			} catch (err: any) {
 				error.set(err?.message || "Failed to fetch AniList notifications");
 			} finally {
@@ -1387,12 +1356,21 @@ function init() {
 
 						function fitRichMediaFrame(frame, media) {
 							function applyFit() {
-								var run = window.requestAnimationFrame || function(fn) { setTimeout(fn, 0); };
-								run(function() {
+								var run = window.requestAnimationFrame;
+								if (run) {
+									run(function() {
+										var rect = media.getBoundingClientRect ? media.getBoundingClientRect() : null;
+										if (!rect || rect.width <= 0) return;
+										frame.style.width = Math.ceil(rect.width) + 'px';
+									});
+									return;
+								}
+
+								(function() {
 									var rect = media.getBoundingClientRect ? media.getBoundingClientRect() : null;
 									if (!rect || rect.width <= 0) return;
 									frame.style.width = Math.ceil(rect.width) + 'px';
-								});
+								})();
 							}
 
 							if (media.tagName === 'IMG') {
@@ -1403,7 +1381,7 @@ function init() {
 
 							media.addEventListener('loadedmetadata', applyFit, { once: true });
 							media.addEventListener('canplay', applyFit, { once: true });
-							setTimeout(applyFit, 0);
+							applyFit();
 						}
 
 						function appendVideoEmbed(frame, wrap, url) {

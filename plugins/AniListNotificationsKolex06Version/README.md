@@ -18,6 +18,10 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.9
+- Removes all `setTimeout`/timer usage from the provider and webview script.
+- Uses a small async/await detail prefetch pass after refresh instead of a delayed queue.
+
 ### 1.0.8
 - Stops background activity detail loading from sending many AniList requests at once.
 - Adds a cooldown message for AniList 429 rate limits instead of showing raw JSON.
