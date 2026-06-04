@@ -575,8 +575,8 @@ function init() {
                 background: rgba(255, 255, 255, 0.08) !important;
             }
 
-            body[data-ama-better-marketplace="true"] .group\/extension-card[data-ama-update-available="true"],
-            body[data-ama-better-marketplace="true"] .ama-catalog-card-wrap[data-ama-update-available="true"] > .group\/extension-card,
+            body[data-ama-better-marketplace="true"] .group\\/extension-card[data-ama-update-available="true"],
+            body[data-ama-better-marketplace="true"] .ama-catalog-card-wrap[data-ama-update-available="true"] > .group\\/extension-card,
             body[data-ama-better-marketplace="true"] .UI-Card__root[data-ama-update-available="true"] {
                 border-color: rgba(56, 189, 248, 0.95) !important;
                 outline: 1px solid rgba(56, 189, 248, 0.85) !important;
@@ -585,8 +585,8 @@ function init() {
                 box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.75), 0 0 18px rgba(56, 189, 248, 0.24) !important;
             }
 
-            body[data-ama-better-marketplace="true"] .group\/extension-card[data-ama-update-available="true"]:hover,
-            body[data-ama-better-marketplace="true"] .ama-catalog-card-wrap[data-ama-update-available="true"] > .group\/extension-card:hover,
+            body[data-ama-better-marketplace="true"] .group\\/extension-card[data-ama-update-available="true"]:hover,
+            body[data-ama-better-marketplace="true"] .ama-catalog-card-wrap[data-ama-update-available="true"] > .group\\/extension-card:hover,
             body[data-ama-better-marketplace="true"] .UI-Card__root[data-ama-update-available="true"]:hover {
                 background: rgba(14, 165, 233, 0.18) !important;
             }
@@ -1915,26 +1915,35 @@ function init() {
                     function applyExtensionUpdateStyle(card, hasUpdate) {
                         if (!card) return;
 
+                        const wrapper = card.closest && card.closest('.ama-catalog-card-wrap');
+                        const targets = wrapper ? [card, wrapper] : [card];
+
                         if (hasUpdate) {
                             card.dataset.amaUpdateAvailable = 'true';
+                            if (wrapper) wrapper.dataset.amaUpdateAvailable = 'true';
 
-                            if (card.style) {
-                                card.style.setProperty('border-color', 'rgba(56, 189, 248, 0.95)', 'important');
-                                card.style.setProperty('outline', '1px solid rgba(56, 189, 248, 0.85)', 'important');
-                                card.style.setProperty('outline-offset', '0', 'important');
-                                card.style.setProperty('box-shadow', '0 0 0 1px rgba(56, 189, 248, 0.75), 0 0 18px rgba(56, 189, 248, 0.24)', 'important');
-                                card.style.setProperty('background', 'rgba(14, 165, 233, 0.12)', 'important');
-                            }
+                            targets.forEach(target => {
+                                if (!target || !target.style) return;
+
+                                target.style.setProperty('border-color', 'rgba(56, 189, 248, 0.95)', 'important');
+                                target.style.setProperty('outline', '1px solid rgba(56, 189, 248, 0.85)', 'important');
+                                target.style.setProperty('outline-offset', '0', 'important');
+                                target.style.setProperty('box-shadow', '0 0 0 1px rgba(56, 189, 248, 0.75), 0 0 18px rgba(56, 189, 248, 0.24)', 'important');
+                                target.style.setProperty('background', 'rgba(14, 165, 233, 0.12)', 'important');
+                            });
                         } else {
                             delete card.dataset.amaUpdateAvailable;
+                            if (wrapper) delete wrapper.dataset.amaUpdateAvailable;
 
-                            if (card.style) {
-                                card.style.removeProperty('border-color');
-                                card.style.removeProperty('outline');
-                                card.style.removeProperty('outline-offset');
-                                card.style.removeProperty('box-shadow');
-                                card.style.removeProperty('background');
-                            }
+                            targets.forEach(target => {
+                                if (!target || !target.style) return;
+
+                                target.style.removeProperty('border-color');
+                                target.style.removeProperty('outline');
+                                target.style.removeProperty('outline-offset');
+                                target.style.removeProperty('box-shadow');
+                                target.style.removeProperty('background');
+                            });
                         }
                     }
 

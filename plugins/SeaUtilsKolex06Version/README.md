@@ -35,6 +35,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.68
+- Fixed update glow selectors so extension cards with available updates get the blue outline/glow.
+- Applies the update glow inline to Full Catalog wrappers as well as the extension card.
+
 ### 1.2.67
 - Added Hide File Names for local library episode filenames.
 - Added the marketplace carousel action-button layout fix for SeaUtils Kolex06-Version.
