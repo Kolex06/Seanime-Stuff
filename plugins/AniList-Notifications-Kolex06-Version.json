@@ -1,0 +1,51 @@
+{
+  "id": "AniList-Notifications-Kolex06-Version",
+  "name": "AniList Notifications Kolex06-Version",
+  "version": "1.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AniList-Notifications-Kolex06-Version.json",
+  "language": "typescript",
+  "type": "plugin",
+  "description": "A Seanime sidebar panel for AniList notifications with larger cards and click-through detail popups.",
+  "author": "Kolex06",
+  "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/AniList-Notifications-Kolex06-Version.png",
+  "website": "https://anilist.co",
+  "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AniListNotificationsKolex06Version/README.md",
+  "notes": "Requires an AniList account connected in Seanime. Open the AniList sidebar button, refresh notifications, click a notification for a larger popup, and use the AniList icon button to open the matching AniList page.",
+  "lang": "en",
+  "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AniListNotificationsKolex06Version/provider.ts",
+  "plugin": {
+    "version": "1",
+    "permissions": {
+      "scopes": [
+        "anilist",
+        "database",
+        "anilist-token",
+        "system"
+      ],
+      "allow": {
+        "networkAccess": {
+          "allowedDomains": [
+            "graphql.anilist.co",
+            "anilist.co",
+            "s4.anilist.co"
+          ],
+          "reasoning": "Required to read the signed-in user's AniList notifications and display AniList cover/avatar images."
+        },
+        "commandScopes": [
+          {
+            "description": "Open AniList notification, anime, manga, activity, thread, comment, and user pages in the default Windows browser.",
+            "command": "rundll32",
+            "args": [
+              {
+                "value": "url.dll,FileProtocolHandler"
+              },
+              {
+                "validator": "^https://anilist\\.co(?:/.*)?$"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -19,6 +19,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 | Extension | Version | ID | Description |
 | --- | --- | --- | --- |
 | SeaUtils Kolex06-Version | 1.2.67 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
+| AniList Notifications Kolex06-Version | 1.0.0 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
 | AsunaTracks Sync | 0.1.21 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
@@ -65,6 +66,36 @@ Icon:
 https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/SeaUtils-Kolex06-Version.png
 ```
 
+## AniList Notifications Kolex06-Version
+
+AniList Notifications Kolex06-Version adds a Seanime sidebar page for AniList notifications.
+
+Features include:
+
+- Sidebar button with a notification bell icon.
+- No black webview background.
+- Larger notification cards with unread highlighting.
+- Click-to-open detail popup for each notification.
+- AniList icon button/link for the matching anime, manga, activity, user, thread, or notifications page.
+
+Direct manifest:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AniList-Notifications-Kolex06-Version.json
+```
+
+Documentation:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AniListNotificationsKolex06Version/README.md
+```
+
+Icon:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/AniList-Notifications-Kolex06-Version.png
+```
+
 ## AsunaTracks Sync
 
 AsunaTracks Sync connects Seanime/AniList progress with AsunaTracks.
@@ -107,6 +138,10 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/as
 ```text
 marketplace.json
 plugins/
+  AniList-Notifications-Kolex06-Version.json
+  AniListNotificationsKolex06Version/
+    README.md
+    provider.ts
   SeaUtils-Kolex06-Version.json
   SeaUtilsKolex06Version/
     README.md
@@ -116,6 +151,7 @@ plugins/
     README.md
     provider.ts
 icons/
+  AniList-Notifications-Kolex06-Version.png
   SeaUtils-Kolex06-Version.png
   asunatracks.png
 ```
