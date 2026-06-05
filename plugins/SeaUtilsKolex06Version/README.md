@@ -8,6 +8,7 @@ SeaUtils Kolex06-Version is a Seanime utility extension focused on improving the
 - Full Catalog action buttons for More, Preferences, Code, and Documentation when available.
 - Update highlighting for extensions with a newer version available.
 - Per-page carousel settings for Search, My Lists, Manga, and Other Pages.
+- Separate Extensions page carousel setting that depends on Better Marketplace.
 - Drag-to-scroll carousel support while keeping normal click behavior.
 - Sub/Dub badges on anime cards.
 - Tray preferences for toggling SeaUtils features.
@@ -19,6 +20,7 @@ SeaUtils adds preferences in the tray and in supported extension action popups:
 - Better Marketplace
 - Carousels
 - Carousels: Search
+- Carousels: Extensions
 - Carousels: My Lists
 - Carousels: Manga
 - Carousels: Other Pages
@@ -34,6 +36,13 @@ The Full Catalog popup keeps extension actions close to each card:
 - More opens extension details and management actions.
 
 ## Version History
+
+### 1.2.69
+- Added a separate Carousels: Extensions setting.
+- Better Marketplace now controls whether the Extensions carousel setting is active.
+- Disabled carousel sub-settings keep their saved on/off state and restore automatically when their parent setting is turned back on.
+- Replaced disabled tray carousel switches with grey text so disabled settings do not appear as active blue switches.
+- Replaced Preferences carousel sub-setting switches with custom On/Off buttons that grey out when disabled.
 
 ### 1.2.68
 - Fixed update glow selectors so extension cards with available updates get the blue outline/glow.

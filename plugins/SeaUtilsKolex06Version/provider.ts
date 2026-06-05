@@ -7,6 +7,7 @@ interface AmaSettings {
     betterMarketplace: boolean
     carousels: boolean
     carouselsSearch: boolean
+    carouselsExtensions: boolean
     carouselsLists: boolean
     carouselsManga: boolean
     carouselsOther: boolean
@@ -23,6 +24,7 @@ function init() {
             betterMarketplace: true,
             carousels: true,
             carouselsSearch: false,
+            carouselsExtensions: true,
             carouselsLists: true,
             carouselsManga: true,
             carouselsOther: true,
@@ -44,11 +46,13 @@ function init() {
 
         function normalizeSettings(value: Partial<AmaSettings> | null | undefined): AmaSettings {
             const saved = value || {}
+            const betterMarketplace = saved.betterMarketplace !== false
 
             return {
-                betterMarketplace: saved.betterMarketplace !== false,
+                betterMarketplace,
                 carousels: saved.carousels !== false,
                 carouselsSearch: saved.carouselsSearch === true,
+                carouselsExtensions: saved.carouselsExtensions !== false,
                 carouselsLists: saved.carouselsLists !== false,
                 carouselsManga: saved.carouselsManga !== false,
                 carouselsOther: saved.carouselsOther !== false,
@@ -84,6 +88,7 @@ function init() {
         const betterMarketplaceRef = ctx.fieldRef<boolean>(settingsState.get().betterMarketplace)
         const carouselsRef = ctx.fieldRef<boolean>(settingsState.get().carousels)
         const carouselsSearchRef = ctx.fieldRef<boolean>(settingsState.get().carouselsSearch)
+        const carouselsExtensionsRef = ctx.fieldRef<boolean>(settingsState.get().carouselsExtensions)
         const carouselsListsRef = ctx.fieldRef<boolean>(settingsState.get().carouselsLists)
         const carouselsMangaRef = ctx.fieldRef<boolean>(settingsState.get().carouselsManga)
         const carouselsOtherRef = ctx.fieldRef<boolean>(settingsState.get().carouselsOther)
@@ -119,6 +124,14 @@ function init() {
             pushSettingsToClient(next)
         }
 
+        function setFieldRefValue<T>(fieldRef: any, value: T) {
+            try {
+                if (fieldRef && typeof fieldRef.set === "function") {
+                    fieldRef.set(value)
+                }
+            } catch (_) {}
+        }
+
         function updateSetting<K extends keyof AmaSettings>(key: K, value: boolean) {
             const current = settingsState.get()
             const next: AmaSettings = {
@@ -139,6 +152,10 @@ function init() {
 
         carouselsSearchRef.onValueChange((value) => {
             updateSetting("carouselsSearch", !!value)
+        })
+
+        carouselsExtensionsRef.onValueChange((value) => {
+            updateSetting("carouselsExtensions", !!value)
         })
 
         carouselsListsRef.onValueChange((value) => {
@@ -162,6 +179,45 @@ function init() {
         })
 
         tray.render(() => {
+            const settings = settingsState.get()
+            const disabledValueText = (label: string, value: boolean, reason: string) => {
+                return tray.text(label + ": " + (value ? "On" : "Off") + " (disabled - " + reason + ")")
+            }
+
+            const carouselSearchControl = settings.carousels
+                ? tray.switch("Carousels: Search", {
+                    fieldRef: carouselsSearchRef,
+                })
+                : disabledValueText("Carousels: Search", settings.carouselsSearch, "turn on Carousels")
+
+            const carouselExtensionsControl = settings.carousels && settings.betterMarketplace
+                ? tray.switch("Carousels: Extensions", {
+                    fieldRef: carouselsExtensionsRef,
+                })
+                : disabledValueText(
+                    "Carousels: Extensions",
+                    settings.carouselsExtensions,
+                    settings.carousels ? "turn on Better Marketplace" : "turn on Carousels"
+                )
+
+            const carouselListsControl = settings.carousels
+                ? tray.switch("Carousels: My Lists", {
+                    fieldRef: carouselsListsRef,
+                })
+                : disabledValueText("Carousels: My Lists", settings.carouselsLists, "turn on Carousels")
+
+            const carouselMangaControl = settings.carousels
+                ? tray.switch("Carousels: Manga", {
+                    fieldRef: carouselsMangaRef,
+                })
+                : disabledValueText("Carousels: Manga", settings.carouselsManga, "turn on Carousels")
+
+            const carouselOtherControl = settings.carousels
+                ? tray.switch("Carousels: Other Pages", {
+                    fieldRef: carouselsOtherRef,
+                })
+                : disabledValueText("Carousels: Other Pages", settings.carouselsOther, "turn on Carousels")
+
             return tray.stack([
                 tray.text("SeaUtils Kolex06-Version Settings"),
                 tray.switch("Better Marketplace", {
@@ -170,18 +226,11 @@ function init() {
                 tray.switch("Carousels", {
                     fieldRef: carouselsRef,
                 }),
-                tray.switch("Carousels: Search", {
-                    fieldRef: carouselsSearchRef,
-                }),
-                tray.switch("Carousels: My Lists", {
-                    fieldRef: carouselsListsRef,
-                }),
-                tray.switch("Carousels: Manga", {
-                    fieldRef: carouselsMangaRef,
-                }),
-                tray.switch("Carousels: Other Pages", {
-                    fieldRef: carouselsOtherRef,
-                }),
+                carouselSearchControl,
+                carouselExtensionsControl,
+                carouselListsControl,
+                carouselMangaControl,
+                carouselOtherControl,
                 tray.switch("Sub/Dub Icons", {
                     fieldRef: subDubIconsRef,
                 }),
@@ -944,6 +993,126 @@ function init() {
                 border-radius: 12px !important;
             }
 
+            .ama-config-switch-row[data-ama-disabled="true"] {
+                opacity: .42 !important;
+                filter: grayscale(1) !important;
+                cursor: not-allowed !important;
+                background: rgba(255,255,255,0.025) !important;
+                border-color: rgba(255,255,255,0.04) !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] * {
+                cursor: not-allowed !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] input {
+                opacity: .5 !important;
+                accent-color: #64748b !important;
+                filter: grayscale(1) saturate(0) !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] input[type="checkbox"] {
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                width: 38px !important;
+                height: 22px !important;
+                min-width: 38px !important;
+                border-radius: 999px !important;
+                border: 1px solid rgba(148,163,184,.45) !important;
+                background: #1f2937 !important;
+                position: relative !important;
+                opacity: .9 !important;
+                filter: none !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] input[type="checkbox"]:checked {
+                background: #475569 !important;
+                border-color: rgba(148,163,184,.7) !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] input[type="checkbox"]::before {
+                content: "" !important;
+                position: absolute !important;
+                top: 2px !important;
+                left: 2px !important;
+                width: 16px !important;
+                height: 16px !important;
+                border-radius: 999px !important;
+                background: #94a3b8 !important;
+                transition: none !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] input[type="checkbox"]:checked::before {
+                transform: translateX(16px) !important;
+                background: #cbd5e1 !important;
+            }
+
+            .ama-disabled-switch-visual {
+                min-width: 44px !important;
+                height: 24px !important;
+                border-radius: 999px !important;
+                border: 1px solid rgba(180,180,180,.45) !important;
+                background: #262626 !important;
+                color: #d4d4d4 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 11px !important;
+                font-weight: 700 !important;
+                line-height: 1 !important;
+                pointer-events: none !important;
+                box-shadow: none !important;
+            }
+
+            .ama-disabled-switch-visual::before {
+                content: none !important;
+            }
+
+            .ama-disabled-switch-visual[data-ama-checked="true"] {
+                background: #3f3f46 !important;
+                border-color: rgba(212,212,216,.65) !important;
+                color: #f4f4f5 !important;
+            }
+
+            .ama-disabled-switch-visual[data-ama-checked="true"]::before {
+                content: none !important;
+            }
+
+            .ama-config-toggle {
+                min-width: 52px !important;
+                height: 26px !important;
+                border-radius: 999px !important;
+                border: 1px solid rgba(148,163,184,.35) !important;
+                background: rgba(15,23,42,.9) !important;
+                color: #cbd5e1 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 11px !important;
+                font-weight: 800 !important;
+                cursor: pointer !important;
+                box-shadow: none !important;
+            }
+
+            .ama-config-toggle[data-ama-value="true"] {
+                background: rgba(14,165,233,.22) !important;
+                border-color: rgba(56,189,248,.7) !important;
+                color: #e0f7ff !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] .ama-config-toggle {
+                background: #262626 !important;
+                border-color: rgba(180,180,180,.45) !important;
+                color: #d4d4d4 !important;
+                cursor: not-allowed !important;
+            }
+
+            .ama-config-switch-row[data-ama-disabled="true"] .ama-config-toggle[data-ama-value="true"] {
+                background: #3f3f46 !important;
+                border-color: rgba(212,212,216,.65) !important;
+                color: #f4f4f5 !important;
+            }
+
             body[data-ama-better-marketplace="true"] .ama-config-help {
                 color: rgba(255,255,255,0.5) !important;
                 font-size: 12px !important;
@@ -1033,6 +1202,11 @@ function init() {
                     const defaultSettings = {
                         betterMarketplace: true,
                         carousels: true,
+                        carouselsSearch: false,
+                        carouselsExtensions: true,
+                        carouselsLists: true,
+                        carouselsManga: true,
+                        carouselsOther: true,
                         subDubIcons: true,
                         hideFileNames: false,
                     };
@@ -1055,12 +1229,18 @@ function init() {
                         } catch (_) {}
                     }
 
-                    let featureSettings = Object.assign(
+                    function normalizeFeatureSettings(settings) {
+                        const next = Object.assign({}, defaultSettings, settings || {});
+
+                        return next;
+                    }
+
+                    let featureSettings = normalizeFeatureSettings(Object.assign(
                         {},
                         defaultSettings,
                         ${JSON.stringify(initialFeatureSettings)},
                         readBrowserSettings()
-                    );
+                    ));
 
                     const CC_ICON =
                         '<svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">' +
@@ -1115,6 +1295,10 @@ function init() {
                             return 'search';
                         }
 
+                        if (isBetterMarketplacePage()) {
+                            return 'extensions';
+                        }
+
                         if (
                             combined.includes('list') ||
                             combined.includes('collection') ||
@@ -1142,10 +1326,15 @@ function init() {
                         const pageKey = getCarouselPageKey();
 
                         if (pageKey === 'search') return featureSettings.carouselsSearch === true;
+                        if (pageKey === 'extensions') return areExtensionCarouselsEnabled();
                         if (pageKey === 'lists') return featureSettings.carouselsLists !== false;
                         if (pageKey === 'manga') return featureSettings.carouselsManga !== false;
 
                         return featureSettings.carouselsOther !== false;
+                    }
+
+                    function areExtensionCarouselsEnabled() {
+                        return !!featureSettings.betterMarketplace && !!featureSettings.carousels && featureSettings.carouselsExtensions !== false;
                     }
 
                     function setBodyFlags() {
@@ -1786,8 +1975,34 @@ function init() {
                         });
 
                         if (root.querySelectorAll) {
+                            root.querySelectorAll('.ama-global-catalog-bar').forEach(bar => bar.remove());
+                            root.querySelectorAll('.ama-extension-carousel').forEach(grid => {
+                                grid.classList.remove('ama-extension-carousel');
+                                grid.dataset.amaDragScrollEnhanced = "false";
+                            });
                             root.querySelectorAll('.ama-modal').forEach(modal => modal.remove());
                         }
+                    }
+
+                    function cleanupExtensionCarousels(root) {
+                        if (!root) return;
+
+                        const grids = [];
+
+                        if (root.matches && root.matches('.ama-extension-carousel')) {
+                            grids.push(root);
+                        }
+
+                        if (root.querySelectorAll) {
+                            root.querySelectorAll('.ama-extension-carousel').forEach(grid => grids.push(grid));
+                        }
+
+                        grids.forEach(grid => {
+                            grid.classList.remove('ama-extension-carousel');
+                            grid.dataset.amaDragScrollEnhanced = "false";
+                            grid.classList.remove('ama-drag-pending');
+                            grid.classList.remove('ama-dragging');
+                        });
                     }
 
                     function hasMarketplaceExtensionCards(root) {
@@ -2320,10 +2535,11 @@ function init() {
                             '<div class="ama-config-form">' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Better Marketplace</label><input data-ama-pref="betterMarketplace" type="checkbox"></div>' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels</label><input data-ama-pref="carousels" type="checkbox"></div>' +
-                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Search</label><input data-ama-pref="carouselsSearch" type="checkbox"></div>' +
-                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: My Lists</label><input data-ama-pref="carouselsLists" type="checkbox"></div>' +
-                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Manga</label><input data-ama-pref="carouselsManga" type="checkbox"></div>' +
-                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Other Pages</label><input data-ama-pref="carouselsOther" type="checkbox"></div>' +
+                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Search</label><button type="button" class="ama-config-toggle" data-ama-pref="carouselsSearch"></button></div>' +
+                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Extensions</label><button type="button" class="ama-config-toggle" data-ama-pref="carouselsExtensions"></button></div>' +
+                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: My Lists</label><button type="button" class="ama-config-toggle" data-ama-pref="carouselsLists"></button></div>' +
+                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Manga</label><button type="button" class="ama-config-toggle" data-ama-pref="carouselsManga"></button></div>' +
+                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Other Pages</label><button type="button" class="ama-config-toggle" data-ama-pref="carouselsOther"></button></div>' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Sub/Dub Icons</label><input data-ama-pref="subDubIcons" type="checkbox"></div>' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Hide File Names</label><input data-ama-pref="hideFileNames" type="checkbox"></div>' +
                                 '<div class="ama-config-actions"><button type="button" class="ama-config-save">Save</button><span class="ama-config-status"></span></div>' +
@@ -2331,31 +2547,167 @@ function init() {
 
                         bindAmaModalClose(modal);
 
-                        ['betterMarketplace', 'carousels', 'carouselsSearch', 'carouselsLists', 'carouselsManga', 'carouselsOther', 'subDubIcons', 'hideFileNames'].forEach(key => {
-                            const input = modal.querySelector('[data-ama-pref="' + key + '"]');
-                            if (input) input.checked = current[key] !== false;
+                        ['betterMarketplace', 'carousels', 'carouselsSearch', 'carouselsExtensions', 'carouselsLists', 'carouselsManga', 'carouselsOther', 'subDubIcons', 'hideFileNames'].forEach(key => {
+                            const control = modal.querySelector('[data-ama-pref="' + key + '"]');
+                            if (!control) return;
+
+                            const value = current[key] !== false;
+
+                            if (control.matches('button')) {
+                                control.dataset.amaValue = value ? 'true' : 'false';
+                                control.textContent = value ? 'On' : 'Off';
+                                control.setAttribute('aria-pressed', value ? 'true' : 'false');
+                                return;
+                            }
+
+                            control.checked = value;
                         });
+
+                        modal.querySelectorAll('.ama-config-toggle').forEach(button => {
+                            button.addEventListener('click', () => {
+                                if (button.disabled || button.dataset.amaDisabled === 'true') return;
+
+                                const nextValue = button.dataset.amaValue !== 'true';
+                                button.dataset.amaValue = nextValue ? 'true' : 'false';
+                                button.textContent = nextValue ? 'On' : 'Off';
+                                button.setAttribute('aria-pressed', nextValue ? 'true' : 'false');
+                            });
+                        });
+
+                        const betterMarketplaceInput = modal.querySelector('[data-ama-pref="betterMarketplace"]');
+                        const carouselsInput = modal.querySelector('[data-ama-pref="carousels"]');
+                        const carouselSettingKeys = ['carouselsSearch', 'carouselsExtensions', 'carouselsLists', 'carouselsManga', 'carouselsOther'];
+
+                        const getPreferenceValue = (control) => {
+                            if (!control) return false;
+                            if (control.matches && control.matches('button')) return control.dataset.amaValue === 'true';
+                            if (control.dataset && control.dataset.amaSavedChecked) return control.dataset.amaSavedChecked === 'true';
+                            return !!control.checked;
+                        };
+
+                        const setPreferenceDisabled = (input, disabled, title) => {
+                            if (!input) return;
+
+                            const row = input.closest('.ama-config-switch-row');
+                            let visual = row ? row.querySelector('.ama-disabled-switch-visual') : null;
+                            const savedChecked = getPreferenceValue(input);
+
+                            if (input.matches && input.matches('button')) {
+                                input.disabled = !!disabled;
+                                input.dataset.amaDisabled = disabled ? 'true' : 'false';
+
+                                if (row) {
+                                    row.dataset.amaDisabled = disabled ? 'true' : 'false';
+                                    row.title = disabled ? (title || '') : '';
+                                    row.style.opacity = disabled ? '0.42' : '';
+                                    row.style.filter = disabled ? 'grayscale(1)' : '';
+                                    row.style.background = disabled ? 'rgba(255,255,255,0.025)' : '';
+                                    row.style.borderColor = disabled ? 'rgba(255,255,255,0.04)' : '';
+                                }
+
+                                return;
+                            }
+
+                            input.disabled = !!disabled;
+                            input.style.visibility = disabled ? 'hidden' : '';
+                            input.style.position = disabled ? 'absolute' : '';
+                            input.style.right = disabled ? '12px' : '';
+                            input.style.pointerEvents = disabled ? 'none' : '';
+                            input.style.width = disabled ? '0' : '';
+                            input.style.height = disabled ? '0' : '';
+                            input.style.minWidth = disabled ? '0' : '';
+                            input.style.opacity = disabled ? '0' : '';
+                            input.style.accentColor = disabled ? '#64748b' : '';
+                            input.style.filter = disabled ? 'grayscale(1) saturate(0)' : '';
+                            input.style.borderRadius = disabled ? '999px' : '';
+                            input.style.border = disabled ? '1px solid rgba(148,163,184,.55)' : '';
+                            input.style.background = disabled ? '#262626' : '';
+                            input.style.boxShadow = disabled ? 'none' : '';
+
+                            if (!row) return;
+
+                            if (disabled) {
+                                input.dataset.amaSavedChecked = savedChecked ? 'true' : 'false';
+                                input.checked = false;
+
+                                if (!visual) {
+                                    visual = document.createElement('span');
+                                    visual.className = 'ama-disabled-switch-visual';
+                                    row.appendChild(visual);
+                                }
+
+                                visual.dataset.amaChecked = savedChecked ? 'true' : 'false';
+                                visual.textContent = savedChecked ? 'On' : 'Off';
+                            } else if (visual) {
+                                visual.remove();
+                            }
+
+                            if (!disabled && input.dataset.amaSavedChecked) {
+                                input.checked = input.dataset.amaSavedChecked === 'true';
+                                delete input.dataset.amaSavedChecked;
+                            }
+
+                            row.dataset.amaDisabled = disabled ? 'true' : 'false';
+                            row.title = disabled ? (title || '') : '';
+                            row.style.opacity = disabled ? '0.42' : '';
+                            row.style.filter = disabled ? 'grayscale(1)' : '';
+                            row.style.background = disabled ? 'rgba(255,255,255,0.025)' : '';
+                            row.style.borderColor = disabled ? 'rgba(255,255,255,0.04)' : '';
+                        };
+
+                        const syncCarouselControls = () => {
+                            const carouselsEnabled = !carouselsInput || carouselsInput.checked;
+                            const betterMarketplaceEnabled = !betterMarketplaceInput || betterMarketplaceInput.checked;
+
+                            carouselSettingKeys.forEach(key => {
+                                const input = modal.querySelector('[data-ama-pref="' + key + '"]');
+                                let disabled = !carouselsEnabled;
+                                let title = 'Turn on Carousels to use this setting.';
+
+                                if (key === 'carouselsExtensions' && !betterMarketplaceEnabled) {
+                                    disabled = true;
+                                    title = 'Turn on Better Marketplace to use this setting.';
+                                }
+
+                                setPreferenceDisabled(input, disabled, title);
+                            });
+                        };
+
+                        if (betterMarketplaceInput) {
+                            betterMarketplaceInput.addEventListener('change', syncCarouselControls);
+                        }
+
+                        if (carouselsInput) {
+                            carouselsInput.addEventListener('change', syncCarouselControls);
+                        }
+
+                        syncCarouselControls();
 
                         const save = modal.querySelector('.ama-config-save');
                         const status = modal.querySelector('.ama-config-status');
 
                         if (save) {
                             save.onclick = () => {
+                                const readPreferenceChecked = (key) => {
+                                    return getPreferenceValue(modal.querySelector('[data-ama-pref="' + key + '"]'));
+                                };
+
                                 const next = {
-                                    betterMarketplace: !!(modal.querySelector('[data-ama-pref="betterMarketplace"]') || {}).checked,
-                                    carousels: !!(modal.querySelector('[data-ama-pref="carousels"]') || {}).checked,
-                                    carouselsSearch: !!(modal.querySelector('[data-ama-pref="carouselsSearch"]') || {}).checked,
-                                    carouselsLists: !!(modal.querySelector('[data-ama-pref="carouselsLists"]') || {}).checked,
-                                    carouselsManga: !!(modal.querySelector('[data-ama-pref="carouselsManga"]') || {}).checked,
-                                    carouselsOther: !!(modal.querySelector('[data-ama-pref="carouselsOther"]') || {}).checked,
-                                    subDubIcons: !!(modal.querySelector('[data-ama-pref="subDubIcons"]') || {}).checked,
-                                    hideFileNames: !!(modal.querySelector('[data-ama-pref="hideFileNames"]') || {}).checked,
+                                    betterMarketplace: readPreferenceChecked('betterMarketplace'),
+                                    carousels: readPreferenceChecked('carousels'),
+                                    carouselsSearch: readPreferenceChecked('carouselsSearch'),
+                                    carouselsExtensions: readPreferenceChecked('carouselsExtensions'),
+                                    carouselsLists: readPreferenceChecked('carouselsLists'),
+                                    carouselsManga: readPreferenceChecked('carouselsManga'),
+                                    carouselsOther: readPreferenceChecked('carouselsOther'),
+                                    subDubIcons: readPreferenceChecked('subDubIcons'),
+                                    hideFileNames: readPreferenceChecked('hideFileNames'),
                                 };
 
                                 if (typeof window.__AMA_SAVE_SETTINGS__ === 'function') {
                                     window.__AMA_SAVE_SETTINGS__(next);
                                 } else {
-                                    featureSettings = Object.assign({}, defaultSettings, next);
+                                    featureSettings = normalizeFeatureSettings(next);
                                     writeBrowserSettings(featureSettings);
                                     setBodyFlags();
                                 }
@@ -3251,9 +3603,11 @@ function init() {
 
                         if (card.dataset.amaEnhanced === marketplaceEnhancementVersion) {
                             const enhancedGrid = card.querySelector('.grid');
-                            if (enhancedGrid) {
+                            if (enhancedGrid && areExtensionCarouselsEnabled()) {
                                 enhancedGrid.classList.add('ama-extension-carousel');
                                 makeDraggableScroller(enhancedGrid, 'betterMarketplace');
+                            } else {
+                                cleanupExtensionCarousels(card);
                             }
 
                             return;
@@ -3306,8 +3660,12 @@ function init() {
                         header.appendChild(left);
                         header.appendChild(right);
                         card.prepend(header);
-                        grid.classList.add('ama-extension-carousel');
-                        makeDraggableScroller(grid, 'betterMarketplace');
+                        if (areExtensionCarouselsEnabled()) {
+                            grid.classList.add('ama-extension-carousel');
+                            makeDraggableScroller(grid, 'betterMarketplace');
+                        } else {
+                            cleanupExtensionCarousels(card);
+                        }
 
                         let searchTimer = null;
 
@@ -3342,6 +3700,10 @@ function init() {
                             cleanupCarousels(root);
                         }
 
+                        if (!areExtensionCarouselsEnabled()) {
+                            cleanupExtensionCarousels(root);
+                        }
+
                         if (!featureSettings.subDubIcons) {
                             cleanupAllMediaBadges(root);
                         }
@@ -3371,6 +3733,8 @@ function init() {
                                 });
                                 markMarketplaceExtensionCards(document);
                                 ensureGlobalFullCatalogButton();
+                            } else {
+                                cleanupBetterMarketplace(document);
                             }
 
                             optimizeImages(document);
@@ -3415,6 +3779,8 @@ function init() {
                                 });
                                 markMarketplaceExtensionCards(root);
                                 ensureGlobalFullCatalogButton();
+                            } else {
+                                cleanupBetterMarketplace(root);
                             }
 
                             optimizeImages(root);
@@ -3451,7 +3817,7 @@ function init() {
                     }
 
                     window.__AMA_SAVE_SETTINGS__ = function(nextSettings) {
-                        featureSettings = Object.assign({}, defaultSettings, nextSettings || {});
+                        featureSettings = normalizeFeatureSettings(nextSettings);
                         writeBrowserSettings(featureSettings);
 
                         setBodyFlags();
@@ -3462,6 +3828,10 @@ function init() {
 
                         if (!areCarouselsEnabledForCurrentPage()) {
                             cleanupCarousels(document);
+                        }
+
+                        if (!areExtensionCarouselsEnabled()) {
+                            cleanupExtensionCarousels(document);
                         }
 
                         if (!featureSettings.subDubIcons) {
