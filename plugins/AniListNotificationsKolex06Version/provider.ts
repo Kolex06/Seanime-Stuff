@@ -12,7 +12,7 @@ type AniListNotification = Record<string, any> & {
 
 function init() {
 	$ui.register((ctx) => {
-		const sidebarIcon = `<span style="display:inline-block;width:24px;height:24px;min-width:24px;min-height:24px;vertical-align:middle;border-radius:6px;background-image:url(https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/AniList-Notifications-Kolex06-Version.png),url(http://127.0.0.1:18126/icons/AniList-Notifications-Kolex06-Version.png);background-size:contain;background-position:center;background-repeat:no-repeat;filter:drop-shadow(0 0 5px rgba(8,168,255,.45))"></span>`;
+		const sidebarIcon = `<span data-anilist-notifications-icon="true" style="position:relative;display:inline-flex;width:24px;height:24px;min-width:24px;min-height:24px;align-items:center;justify-content:center;vertical-align:middle;color:currentColor"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 6.2-2.6 8.2-3.2 8.7a.7.7 0 0 0 .4 1.3h17.6a.7.7 0 0 0 .4-1.3C20.6 16.2 18 14.2 18 8Z"></path><path d="M10 21h4"></path></svg></span>`;
 
 		const webview = ctx.newWebview({
 			slot: "screen",
@@ -23,7 +23,6 @@ function init() {
 				icon: sidebarIcon,
 			},
 		});
-
 		const notifications = ctx.state<AniListNotification[]>([]);
 		const unreadCount = ctx.state<number>(0);
 		const loading = ctx.state<boolean>(false);
@@ -32,6 +31,10 @@ function init() {
 		const currentPage = ctx.state<number>(1);
 		const error = ctx.state<string | null>(null);
 		const lastUpdated = ctx.state<string>("");
+		let hasLoadedNotifications = false;
+		const seenNotificationIds = new Set<number>();
+		let activePopupId = 0;
+		let activePopupPayload: Record<string, any> | null = null;
 
 		webview.channel.sync("notifications", notifications);
 		webview.channel.sync("unreadCount", unreadCount);
@@ -285,6 +288,35 @@ function init() {
 			}
 		`;
 
+		const MARK_NOTIFICATIONS_READ = `
+			query {
+				Page(page: 1, perPage: 1) {
+					notifications(resetNotificationCount: true) {
+						... on AiringNotification { id }
+						... on FollowingNotification { id }
+						... on ActivityMessageNotification { id }
+						... on ActivityMentionNotification { id }
+						... on ActivityReplyNotification { id }
+						... on ActivityReplySubscribedNotification { id }
+						... on ActivityLikeNotification { id }
+						... on ActivityReplyLikeNotification { id }
+						... on ThreadCommentMentionNotification { id }
+						... on ThreadCommentReplyNotification { id }
+						... on ThreadCommentSubscribedNotification { id }
+						... on ThreadCommentLikeNotification { id }
+						... on ThreadLikeNotification { id }
+						... on RelatedMediaAdditionNotification { id }
+						... on MediaDataChangeNotification { id }
+						... on MediaMergeNotification { id }
+						... on MediaDeletionNotification { id }
+						... on MediaSubmissionUpdateNotification { id }
+						... on StaffSubmissionUpdateNotification { id }
+						... on CharacterSubmissionUpdateNotification { id }
+					}
+				}
+			}
+		`;
+
 		const GET_ACTIVITY_DETAIL = `
 			query ($id: Int) {
 				Activity(id: $id) {
@@ -341,6 +373,446 @@ function init() {
 		const PREFETCH_DETAIL_LIMIT = 4;
 		const loadingActivityIds = new Set<number>();
 		const prefetchedActivityIds = new Set<number>();
+
+		function plainText(value: any): string {
+			return String(value || "")
+				.replace(/<[^>]*>/g, " ")
+				.replace(/\s+/g, " ")
+				.trim();
+		}
+
+		function shortText(value: any, max = 120): string {
+			const text = plainText(value);
+			return text.length > max ? `${text.slice(0, max - 1).trim()}...` : text;
+		}
+
+		function titleCase(value: any): string {
+			return String(value || "Notification")
+				.replace(/_/g, " ")
+				.toLowerCase()
+				.replace(/\b\w/g, (char) => char.toUpperCase());
+		}
+
+		function mediaTitle(media: any): string {
+			if (!media?.title) return "";
+			return media.title.english || media.title.romaji || media.title.native || "";
+		}
+
+		function activitySummary(activity: any): string {
+			if (!activity) return "";
+			const text = plainText(activity.text || activity.message);
+			if (text) return text;
+
+			const title = mediaTitle(activity.media);
+			if (title) return title;
+
+			const parts = [activity.user?.name, activity.status, activity.progress].filter(Boolean).map(String);
+			return parts.join(" ");
+		}
+
+		function notificationToastTitle(item: AniListNotification): string {
+			const userName = item.user?.name || "";
+			const title = mediaTitle(item.media);
+
+			switch (item.type) {
+				case "AIRING":
+					return `Episode ${item.episode || "?"} aired`;
+				case "FOLLOWING":
+					return userName ? `${userName} followed you` : "New follower";
+				case "ACTIVITY_MESSAGE":
+					return userName ? `Message from ${userName}` : "New activity message";
+				case "ACTIVITY_MENTION":
+					return userName ? `${userName} mentioned you` : "You were mentioned";
+				case "ACTIVITY_REPLY":
+					return userName ? `${userName} replied to you` : "New activity reply";
+				case "ACTIVITY_LIKE":
+					return userName ? `${userName} liked your activity` : "Activity liked";
+				case "ACTIVITY_REPLY_LIKE":
+					return userName ? `${userName} liked your reply` : "Reply liked";
+				case "ACTIVITY_REPLY_SUBSCRIBED":
+					return "New reply on a subscribed activity";
+				case "THREAD_COMMENT_MENTION":
+					return userName ? `${userName} mentioned you in a thread` : "Thread mention";
+				case "THREAD_COMMENT_REPLY":
+					return userName ? `${userName} replied in a thread` : "Thread reply";
+				case "THREAD_COMMENT_SUBSCRIBED":
+					return "New comment in a subscribed thread";
+				case "THREAD_COMMENT_LIKE":
+					return userName ? `${userName} liked your thread comment` : "Thread comment liked";
+				case "THREAD_LIKE":
+					return userName ? `${userName} liked your thread` : "Thread liked";
+				case "RELATED_MEDIA_ADDITION":
+					return title ? `Related media added for ${title}` : "Related media added";
+				case "MEDIA_DATA_CHANGE":
+					return title ? `Media data changed for ${title}` : "Media data changed";
+				case "MEDIA_MERGE":
+					return title ? `Media merged into ${title}` : "Media merged";
+				case "MEDIA_DELETION":
+					return item.deletedMediaTitle ? `${item.deletedMediaTitle} was deleted` : "Media deleted";
+				default:
+					return title || titleCase(item.type);
+			}
+		}
+
+		function notificationToastText(item: AniListNotification): string {
+			return shortText(
+				item.context ||
+				item.message?.message ||
+				item.activity?.text ||
+				item.activity?.message ||
+				activitySummary(item.activity) ||
+				item.comment?.comment ||
+				item.reason ||
+				"",
+			);
+		}
+
+		function notificationImage(item: AniListNotification): string {
+			return item.user?.avatar?.large || item.user?.avatar?.medium ||
+				item.media?.coverImage?.large || item.media?.coverImage?.medium ||
+				item.activity?.media?.coverImage?.large || item.activity?.media?.coverImage?.medium ||
+				"";
+		}
+
+		function popupPayload(item: AniListNotification, count: number) {
+			const title = notificationToastTitle(item);
+			const text = notificationToastText(item);
+			return {
+				id: Number(item.id || 0),
+				title,
+				text: text && text !== title ? text : "",
+				image: notificationImage(item),
+				count,
+				type: titleCase(item.type),
+			};
+		}
+
+		function escapeHtml(value: any): string {
+			return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+				"&": "&amp;",
+				"<": "&lt;",
+				">": "&gt;",
+				'"': "&quot;",
+				"'": "&#39;",
+			}[char] || char));
+		}
+
+		function popupInitials(value: any): string {
+			return String(value || "AniList")
+				.split(/\s+/)
+				.filter(Boolean)
+				.map((part) => part.charAt(0))
+				.join("")
+				.slice(0, 2)
+				.toUpperCase() || "AL";
+		}
+
+		async function hideGlobalNotificationPopup() {
+			activePopupId = 0;
+			activePopupPayload = null;
+			try {
+				const root = await ctx.dom.queryOne('[data-anilist-notifications-global-popup="true"]');
+				if (root) root.setStyle("display", "none");
+			} catch (_) {}
+		}
+
+		async function clickNotificationsSidebarButton() {
+			try {
+				const body = await ctx.dom.queryOne("body");
+				if (!body) return;
+
+				const screenPath = String(webview.getScreenPath() || "");
+				const script = await ctx.dom.createElement("script");
+				script.setText(`
+					(() => {
+						const pluginId = 'AniList-Notifications-Kolex06-Version';
+						const screenPath = ${JSON.stringify(screenPath)};
+
+						function isVisible(element) {
+							if (!element) return false;
+							const style = window.getComputedStyle(element);
+							const rect = element.getBoundingClientRect();
+							return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+						}
+
+						function clickableFrom(node) {
+							if (!node || !node.closest) return null;
+							return node.closest('a[href], button, [role="button"], [tabindex]');
+						}
+
+						const candidates = [];
+						[
+							document.querySelector('[data-anilist-notifications-icon="true"]'),
+							document.querySelector('[data-anilist-notifications-badge="true"]'),
+							document.querySelector('[data-anilist-notifications-dom-badge="true"]')
+						].forEach(node => {
+							const target = clickableFrom(node);
+							if (target) candidates.push(target);
+						});
+
+						document.querySelectorAll('a[href], button, [role="button"], [tabindex]').forEach(element => {
+							const href = String(element.getAttribute('href') || '');
+							const label = String(element.textContent || element.getAttribute('aria-label') || element.getAttribute('title') || '').trim();
+							if (
+								(screenPath && href.indexOf(screenPath) !== -1) ||
+								href.indexOf(pluginId) !== -1 ||
+								label === 'Notifications' ||
+								label.indexOf('AniList Notifications') !== -1
+							) {
+								candidates.push(element);
+							}
+						});
+
+						const target = candidates.find(isVisible);
+						if (target && typeof target.click === 'function') target.click();
+						if (document.currentScript && document.currentScript.remove) document.currentScript.remove();
+					})();
+				`);
+				body.append(script);
+			} catch (_) {}
+		}
+
+		function openGlobalNotificationPopup() {
+			void hideGlobalNotificationPopup();
+			void clickNotificationsSidebarButton();
+		}
+
+		async function ensureGlobalNotificationPopup() {
+			let root = await ctx.dom.queryOne('[data-anilist-notifications-global-popup="true"]');
+			if (root) return root;
+
+			const body = await ctx.dom.queryOne("body");
+			if (!body) return null;
+
+			root = await ctx.dom.createElement("div");
+			root.setAttribute("data-anilist-notifications-global-popup", "true");
+			root.setCssText([
+				"position:fixed",
+				"top:14px",
+				"right:14px",
+				"left:auto",
+				"bottom:auto",
+				"width:min(360px, calc(100vw - 28px))",
+				"display:none",
+				"background:transparent",
+				"z-index:2147483000",
+				"pointer-events:auto",
+			].join(";"));
+
+			const card = await ctx.dom.createElement("button");
+			card.setAttribute("type", "button");
+			card.setAttribute("data-anilist-notifications-global-card", "true");
+			card.setCssText([
+				"appearance:none",
+				"-webkit-appearance:none",
+				"width:100%",
+				"min-height:112px",
+				"display:grid",
+				"grid-template-columns:48px minmax(0,1fr) 30px",
+				"gap:12px",
+				"align-items:start",
+				"padding:13px",
+				"border:1px solid rgba(226,232,240,.22)",
+				"border-radius:8px",
+				"background:rgba(24,36,56,.96)",
+				"box-shadow:0 18px 46px rgba(0,0,0,.34)",
+				"color:#f8fafc",
+				"font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+				"text-align:left",
+				"cursor:pointer",
+				"backdrop-filter:blur(16px)",
+			].join(";"));
+			card.addEventListener("click", openGlobalNotificationPopup);
+
+			const image = await ctx.dom.createElement("div");
+			image.setAttribute("data-anilist-notifications-global-image", "true");
+			image.setCssText([
+				"width:48px",
+				"height:48px",
+				"display:inline-flex",
+				"align-items:center",
+				"justify-content:center",
+				"overflow:hidden",
+				"border-radius:8px",
+				"background:rgba(2,169,255,.18)",
+				"color:#7dd3fc",
+				"font-weight:900",
+				"font-size:14px",
+				"line-height:1",
+			].join(";"));
+
+			const copy = await ctx.dom.createElement("div");
+			copy.setCssText("min-width:0");
+
+			const kicker = await ctx.dom.createElement("div");
+			kicker.setAttribute("data-anilist-notifications-global-kicker", "true");
+			kicker.setCssText("margin-bottom:4px;color:#7dd3fc;font-size:11px;font-weight:900;text-transform:uppercase;line-height:1.1");
+
+			const title = await ctx.dom.createElement("div");
+			title.setAttribute("data-anilist-notifications-global-title", "true");
+			title.setCssText("margin:0;color:#f8fafc;font-size:15px;font-weight:900;line-height:1.22;word-break:break-word");
+
+			const text = await ctx.dom.createElement("div");
+			text.setAttribute("data-anilist-notifications-global-text", "true");
+			text.setCssText("display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:5px;color:#cbd5e1;font-size:13px;line-height:1.28;word-break:break-word");
+
+			const more = await ctx.dom.createElement("div");
+			more.setAttribute("data-anilist-notifications-global-more", "true");
+			more.setCssText("display:none;margin-top:6px;color:#94a3b8;font-size:11px;font-weight:800");
+
+			const close = await ctx.dom.createElement("button");
+			close.setAttribute("type", "button");
+			close.setAttribute("aria-label", "Close AniList notification popup");
+			close.setText("x");
+			close.setCssText([
+				"appearance:none",
+				"-webkit-appearance:none",
+				"width:28px",
+				"height:28px",
+				"display:inline-flex",
+				"align-items:center",
+				"justify-content:center",
+				"border:1px solid rgba(226,232,240,.18)",
+				"border-radius:8px",
+				"background:rgba(255,255,255,.06)",
+				"color:#f8fafc",
+				"font-size:14px",
+				"font-weight:900",
+				"line-height:1",
+				"cursor:pointer",
+			].join(";"));
+			close.addEventListener("click", (event: any) => {
+				try {
+					event?.preventDefault?.();
+					event?.stopPropagation?.();
+				} catch (_) {}
+				void hideGlobalNotificationPopup();
+			});
+
+			copy.append(kicker);
+			copy.append(title);
+			copy.append(text);
+			copy.append(more);
+			card.append(image);
+			card.append(copy);
+			card.append(close);
+			root.append(card);
+			body.append(root);
+			return root;
+		}
+
+		async function showGlobalNotificationPopup(payload: Record<string, any>) {
+			activePopupId = Number(payload.id || 0);
+			activePopupPayload = payload;
+
+			try {
+				const root = await ensureGlobalNotificationPopup();
+				if (!root) return;
+
+				const image = await root.queryOne('[data-anilist-notifications-global-image="true"]');
+				const kicker = await root.queryOne('[data-anilist-notifications-global-kicker="true"]');
+				const title = await root.queryOne('[data-anilist-notifications-global-title="true"]');
+				const text = await root.queryOne('[data-anilist-notifications-global-text="true"]');
+				const more = await root.queryOne('[data-anilist-notifications-global-more="true"]');
+
+				if (image) {
+					if (payload.image) {
+						image.setInnerHTML(`<img src="${escapeHtml(payload.image)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`);
+					} else {
+						image.setText(popupInitials(payload.title));
+					}
+				}
+				if (kicker) kicker.setText(payload.type || "AniList");
+				if (title) title.setText(payload.title || "AniList notification");
+				if (text) {
+					text.setText(payload.text || "");
+					text.setStyle("display", payload.text ? "-webkit-box" : "none");
+				}
+				if (more) {
+					const extra = Math.max(0, Number(payload.count || 0) - 1);
+					more.setText(extra > 0 ? `+${extra} more` : "");
+					more.setStyle("display", extra > 0 ? "block" : "none");
+				}
+				root.setStyle("display", "block");
+			} catch (_) {}
+		}
+
+		async function updateSidebarBadge(count = unreadCount.get()) {
+			const unread = Math.max(0, Number(count || 0));
+			const label = unread > 99 ? "99+" : String(unread);
+
+			try {
+				const badges = await ctx.dom.query('[data-anilist-notifications-badge="true"]');
+				for (const badge of badges) {
+					badge.setText("");
+					badge.setStyle("display", "none");
+					badge.setAttribute("aria-label", unread > 0 ? `${unread} unread AniList notifications` : "No unread AniList notifications");
+				}
+			} catch (_) {}
+
+			try {
+				const screenPath = webview.getScreenPath();
+				const selectors = [
+					`a[href="${screenPath}"]`,
+					`a[href*="AniList-Notifications-Kolex06-Version"]`,
+					`button[aria-label="Notifications"]`,
+					`[title="Notifications"]`,
+				].join(",");
+				const targets = await ctx.dom.query(selectors);
+				for (const target of targets) {
+					target.setStyle("position", "relative");
+					target.setStyle("overflow", "visible");
+
+					let badge = await target.queryOne('[data-anilist-notifications-dom-badge="true"]');
+					if (!badge) {
+						badge = await ctx.dom.createElement("span");
+						badge.setAttribute("data-anilist-notifications-dom-badge", "true");
+						target.append(badge);
+					}
+
+					badge.setText(label);
+					badge.setCssText([
+						"position:absolute",
+						"top:2px",
+						"right:2px",
+						"display:" + (unread > 0 ? "inline-flex" : "none"),
+						"min-width:18px",
+						"height:18px",
+						"padding:0 5px",
+						"align-items:center",
+						"justify-content:center",
+						"border-radius:999px",
+						"background:#f8fafc",
+						"color:#0f172a",
+						"border:1px solid rgba(15,23,42,.35)",
+						"font-size:10px",
+						"font-weight:900",
+						"line-height:18px",
+						"z-index:50",
+						"box-shadow:0 2px 8px rgba(0,0,0,.35)",
+						"pointer-events:none",
+					].join(";"));
+					badge.setAttribute("aria-label", unread > 0 ? `${unread} unread AniList notifications` : "No unread AniList notifications");
+				}
+			} catch (_) {}
+		}
+
+		function rememberNotifications(items: AniListNotification[]) {
+			for (const item of items) {
+				const id = Number(item?.id || 0);
+				if (id) seenNotificationIds.add(id);
+			}
+		}
+
+		function newUnreadNotifications(items: AniListNotification[], resetNotificationCount: boolean, append: boolean) {
+			if (resetNotificationCount || append) return [];
+			return items.filter((item) => item.unread && (!hasLoadedNotifications || !seenNotificationIds.has(Number(item.id || 0)))).slice(0, 3);
+		}
+
+		function showNewNotificationPopup(items: AniListNotification[]) {
+			if (!items.length) return;
+			void showGlobalNotificationPopup(popupPayload(items[0], items.length));
+		}
 
 		function notificationGlobalIndex(page: number, index: number): number {
 			return Math.max(0, (Number(page || 1) - 1) * NOTIFICATIONS_PER_PAGE + index);
@@ -430,12 +902,17 @@ function init() {
 					unread: notificationGlobalIndex(page, index) < unread,
 				}));
 				const pageInfo = data?.Page?.pageInfo || {};
+				const toastItems = newUnreadNotifications(items, resetNotificationCount, append);
 
 				notifications.set(append ? mergeNotifications(notifications.get(), items) : items);
 				unreadCount.set(unread);
+				void updateSidebarBadge(unread);
 				hasNextPage.set(!!pageInfo.hasNextPage);
 				currentPage.set(Number(pageInfo.currentPage || page || 1));
 				lastUpdated.set(new Date().toLocaleString());
+				showNewNotificationPopup(toastItems);
+				rememberNotifications(items);
+				hasLoadedNotifications = true;
 				void prefetchActivityDetails(items);
 			} catch (err: any) {
 				error.set(err?.message || "Failed to fetch AniList notifications");
@@ -476,11 +953,42 @@ function init() {
 		function markLocalRead(id: number) {
 			const current = notifications.get();
 			const target = current.find((item) => item.id === id);
-			if (!target || !target.unread) return;
+			if (!target || !target.unread) return false;
 
 			notifications.set(current.map((item) => (item.id === id ? { ...item, unread: false } : item)));
 			unreadCount.set(Math.max(0, unreadCount.get() - 1));
+			void updateSidebarBadge(unreadCount.get());
+			return true;
 		}
+
+		function markAllLocalRead() {
+			const current = notifications.get();
+			if (!current.length && unreadCount.get() <= 0) return;
+
+			notifications.set(current.map((item) => ({ ...item, unread: false })));
+			unreadCount.set(0);
+			void updateSidebarBadge(0);
+		}
+
+		async function markNotificationRead(id: number) {
+			const changed = markLocalRead(id);
+			if (!changed) return;
+
+			try {
+				await anilistFetch(MARK_NOTIFICATIONS_READ);
+				markAllLocalRead();
+			} catch (err: any) {
+				error.set(err?.message || "Opened locally, but AniList could not mark notifications as read.");
+			}
+		}
+
+		ctx.dom.onReady(() => {
+			void updateSidebarBadge(unreadCount.get());
+		});
+		ctx.screen.onNavigate(() => {
+			void updateSidebarBadge(unreadCount.get());
+			if (activePopupPayload) void showGlobalNotificationPopup(activePopupPayload);
+		});
 
 		function safeAniListUrl(value: any): string {
 			const url = String(value || "").trim();
@@ -524,7 +1032,7 @@ function init() {
 			if (!hasNextPage.get()) return;
 			fetchNotifications(false, currentPage.get() + 1, true);
 		});
-		webview.channel.on("mark-read-local", (id: number) => markLocalRead(Number(id)));
+		webview.channel.on("mark-read-local", (id: number) => void markNotificationRead(Number(id)));
 		webview.channel.on("load-activity-detail", (activityId: number) => loadActivityDetail(Number(activityId)));
 		webview.channel.on("open-url", (url: string) => openAniListUrl(url));
 		webview.channel.on("open-seanime-media", (value: any) => openSeanimeMedia(value));
