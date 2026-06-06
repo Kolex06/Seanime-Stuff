@@ -795,6 +795,100 @@ function init() {
 					badge.setAttribute("aria-label", unread > 0 ? `${unread} unread AniList notifications` : "No unread AniList notifications");
 				}
 			} catch (_) {}
+
+			try {
+				const body = await ctx.dom.queryOne("body");
+				if (!body) return;
+
+				const screenPath = String(webview.getScreenPath() || "");
+				const script = await ctx.dom.createElement("script");
+				script.setText(`
+					(() => {
+						const unread = ${JSON.stringify(unread)};
+						const label = ${JSON.stringify(label)};
+						const pluginId = 'AniList-Notifications-Kolex06-Version';
+						const screenPath = ${JSON.stringify(screenPath)};
+						const aria = unread > 0 ? unread + ' unread AniList notifications' : 'No unread AniList notifications';
+
+						document.querySelectorAll('[data-anilist-notifications-badge="true"]').forEach(badge => {
+							badge.textContent = '';
+							badge.style.display = 'none';
+							badge.setAttribute('aria-label', aria);
+						});
+
+						function clickableFrom(node) {
+							return node && node.closest ? node.closest('a[href], button, [role="button"], [tabindex]') : null;
+						}
+
+						const targets = [];
+						document.querySelectorAll('[data-anilist-notifications-icon="true"], [data-anilist-notifications-dom-badge="true"]').forEach(node => {
+							const target = clickableFrom(node);
+							if (target) targets.push(target);
+						});
+
+						document.querySelectorAll('a[href], button, [role="button"], [tabindex]').forEach(element => {
+							const href = String(element.getAttribute('href') || '');
+							const text = String(element.textContent || element.getAttribute('aria-label') || element.getAttribute('title') || '').trim();
+							if (
+								(screenPath && href.indexOf(screenPath) !== -1) ||
+								href.indexOf(pluginId) !== -1 ||
+								text === 'Notifications' ||
+								text.indexOf('AniList Notifications') !== -1
+							) {
+								targets.push(element);
+							}
+						});
+
+						const seen = new Set();
+						targets.forEach(target => {
+							if (!target || seen.has(target)) return;
+							seen.add(target);
+							target.style.position = 'relative';
+							target.style.overflow = 'visible';
+
+							let badge = target.querySelector('[data-anilist-notifications-dom-badge="true"]');
+							if (!badge) {
+								badge = document.createElement('span');
+								badge.setAttribute('data-anilist-notifications-dom-badge', 'true');
+								target.appendChild(badge);
+							}
+
+							badge.textContent = unread > 0 ? label : '';
+							badge.setAttribute('aria-label', aria);
+							badge.style.position = 'absolute';
+							badge.style.top = '2px';
+							badge.style.right = '2px';
+							badge.style.display = unread > 0 ? 'inline-flex' : 'none';
+							badge.style.minWidth = '18px';
+							badge.style.height = '18px';
+							badge.style.padding = '0 5px';
+							badge.style.alignItems = 'center';
+							badge.style.justifyContent = 'center';
+							badge.style.borderRadius = '999px';
+							badge.style.background = '#f8fafc';
+							badge.style.color = '#0f172a';
+							badge.style.border = '1px solid rgba(15,23,42,.35)';
+							badge.style.fontSize = '10px';
+							badge.style.fontWeight = '900';
+							badge.style.lineHeight = '18px';
+							badge.style.zIndex = '50';
+							badge.style.boxShadow = '0 2px 8px rgba(0,0,0,.35)';
+							badge.style.pointerEvents = 'none';
+						});
+
+						if (unread <= 0) {
+							document.querySelectorAll('[data-anilist-notifications-dom-badge="true"]').forEach(badge => {
+								badge.textContent = '';
+								badge.style.display = 'none';
+								badge.setAttribute('aria-label', aria);
+							});
+						}
+
+						if (document.currentScript && document.currentScript.remove) document.currentScript.remove();
+					})();
+				`);
+				body.append(script);
+			} catch (_) {}
 		}
 
 		function rememberNotifications(items: AniListNotification[]) {

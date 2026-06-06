@@ -24,6 +24,7 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 - Shows a top-right Seanime popup when unread AniList notifications appear.
 - Makes the top-right popup open the AniList Notifications page by clicking the real Seanime sidebar button.
 - Clicking an unread notification marks AniList notifications as read.
+- Forces the sidebar unread badge to hide immediately after notifications are marked read.
 
 ### 1.0.12
 - Makes anime and manga boxes in notification cards and popups open the matching Seanime entry page.
