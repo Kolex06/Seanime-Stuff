@@ -776,12 +776,9 @@ function init() {
 						"top:2px",
 						"right:2px",
 						"display:" + (unread > 0 ? "inline-flex" : "none"),
-						"width:auto",
-						"min-width:24px",
-						"max-width:none",
+						"min-width:18px",
 						"height:18px",
 						"padding:0 5px",
-						"box-sizing:border-box",
 						"align-items:center",
 						"justify-content:center",
 						"border-radius:999px",
@@ -791,9 +788,6 @@ function init() {
 						"font-size:10px",
 						"font-weight:900",
 						"line-height:18px",
-						"white-space:nowrap",
-						"overflow:visible",
-						"text-overflow:clip",
 						"z-index:50",
 						"box-shadow:0 2px 8px rgba(0,0,0,.35)",
 						"pointer-events:none",
@@ -865,12 +859,9 @@ function init() {
 							badge.style.top = '2px';
 							badge.style.right = '2px';
 							badge.style.display = unread > 0 ? 'inline-flex' : 'none';
-							badge.style.width = 'auto';
-							badge.style.minWidth = '24px';
-							badge.style.maxWidth = 'none';
+							badge.style.minWidth = '18px';
 							badge.style.height = '18px';
 							badge.style.padding = '0 5px';
-							badge.style.boxSizing = 'border-box';
 							badge.style.alignItems = 'center';
 							badge.style.justifyContent = 'center';
 							badge.style.borderRadius = '999px';
@@ -880,9 +871,6 @@ function init() {
 							badge.style.fontSize = '10px';
 							badge.style.fontWeight = '900';
 							badge.style.lineHeight = '18px';
-							badge.style.whiteSpace = 'nowrap';
-							badge.style.overflow = 'visible';
-							badge.style.textOverflow = 'clip';
 							badge.style.zIndex = '50';
 							badge.style.boxShadow = '0 2px 8px rgba(0,0,0,.35)';
 							badge.style.pointerEvents = 'none';
@@ -2488,11 +2476,6 @@ function init() {
 							return link;
 						}
 
-						function pageUnreadBadgeLabel(value) {
-							var count = Math.max(0, Number(value || 0));
-							return String(count);
-						}
-
 						function renderHeader(root) {
 							var header = create('div', 'header');
 							var left = create('div', 'header-title-row');
@@ -2506,7 +2489,7 @@ function init() {
 							left.appendChild(copy);
 
 							var actions = create('div', 'header-actions');
-							var badge = create('span', 'badge' + (state.unreadCount > 0 ? '' : ' hidden'), pageUnreadBadgeLabel(state.unreadCount));
+							var badge = create('span', 'badge' + (state.unreadCount > 0 ? '' : ' hidden'), state.unreadCount);
 							var refresh = create('button', 'btn btn-primary');
 							refresh.type = 'button';
 							refresh.disabled = !!state.loading;
