@@ -12,7 +12,7 @@ type AniListNotification = Record<string, any> & {
 
 function init() {
 	$ui.register((ctx) => {
-		const sidebarIcon = `<span data-anilist-notifications-icon="true" style="position:relative;display:inline-flex;width:24px;height:24px;min-width:24px;min-height:24px;align-items:center;justify-content:center;vertical-align:middle;color:currentColor"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 6.2-2.6 8.2-3.2 8.7a.7.7 0 0 0 .4 1.3h17.6a.7.7 0 0 0 .4-1.3C20.6 16.2 18 14.2 18 8Z"></path><path d="M10 21h4"></path></svg></span>`;
+		const sidebarIcon = `<span data-anilist-notifications-icon="true" style="position:relative;display:inline-flex;width:24px;height:24px;min-width:24px;min-height:24px;align-items:center;justify-content:center;vertical-align:middle;color:currentColor;overflow:visible"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 6.2-2.6 8.2-3.2 8.7a.7.7 0 0 0 .4 1.3h17.6a.7.7 0 0 0 .4-1.3C20.6 16.2 18 14.2 18 8Z"></path><path d="M10 21h4"></path></svg></span>`;
 
 		const webview = ctx.newWebview({
 			slot: "screen",
@@ -25,6 +25,7 @@ function init() {
 		});
 		const notifications = ctx.state<AniListNotification[]>([]);
 		const unreadCount = ctx.state<number>(0);
+		const unreadCountLabel = ctx.state<string>("0");
 		const loading = ctx.state<boolean>(false);
 		const loadingMore = ctx.state<boolean>(false);
 		const hasNextPage = ctx.state<boolean>(false);
@@ -38,6 +39,7 @@ function init() {
 
 		webview.channel.sync("notifications", notifications);
 		webview.channel.sync("unreadCount", unreadCount);
+		webview.channel.sync("unreadCountLabel", unreadCountLabel);
 		webview.channel.sync("loading", loading);
 		webview.channel.sync("loadingMore", loadingMore);
 		webview.channel.sync("hasNextPage", hasNextPage);
@@ -317,6 +319,40 @@ function init() {
 			}
 		`;
 
+		const GET_NOTIFICATION_MARKERS = `
+			query ($page: Int, $perPage: Int) {
+				Page(page: $page, perPage: $perPage) {
+					pageInfo {
+						currentPage
+						hasNextPage
+					}
+					notifications(resetNotificationCount: false) {
+						__typename
+						... on AiringNotification { id createdAt }
+						... on FollowingNotification { id createdAt }
+						... on ActivityMessageNotification { id createdAt }
+						... on ActivityMentionNotification { id createdAt }
+						... on ActivityReplyNotification { id createdAt }
+						... on ActivityReplySubscribedNotification { id createdAt }
+						... on ActivityLikeNotification { id createdAt }
+						... on ActivityReplyLikeNotification { id createdAt }
+						... on ThreadCommentMentionNotification { id createdAt }
+						... on ThreadCommentReplyNotification { id createdAt }
+						... on ThreadCommentSubscribedNotification { id createdAt }
+						... on ThreadCommentLikeNotification { id createdAt }
+						... on ThreadLikeNotification { id createdAt }
+						... on RelatedMediaAdditionNotification { id createdAt }
+						... on MediaDataChangeNotification { id createdAt }
+						... on MediaMergeNotification { id createdAt }
+						... on MediaDeletionNotification { id createdAt }
+						... on MediaSubmissionUpdateNotification { id createdAt }
+						... on StaffSubmissionUpdateNotification { id createdAt }
+						... on CharacterSubmissionUpdateNotification { id createdAt }
+					}
+				}
+			}
+		`;
+
 		const GET_ACTIVITY_DETAIL = `
 			query ($id: Int) {
 				Activity(id: $id) {
@@ -371,6 +407,8 @@ function init() {
 
 		const NOTIFICATIONS_PER_PAGE = 25;
 		const PREFETCH_DETAIL_LIMIT = 4;
+		const UNREAD_COUNT_SCAN_PAGE_LIMIT = 20;
+		const READ_MARKER_STORAGE_KEY = "anilist-notifications-kolex06:read-marker";
 		const loadingActivityIds = new Set<number>();
 		const prefetchedActivityIds = new Set<number>();
 
@@ -737,9 +775,9 @@ function init() {
 			} catch (_) {}
 		}
 
-		async function updateSidebarBadge(count = unreadCount.get()) {
+		async function updateSidebarBadge(count = unreadCount.get(), displayLabel = unreadCountLabel.get()) {
 			const unread = Math.max(0, Number(count || 0));
-			const label = unread > 99 ? "99+" : String(unread);
+			const label = String(displayLabel || "").indexOf("+") !== -1 || unread > 99 ? "99+" : String(unread);
 
 			try {
 				const badges = await ctx.dom.query('[data-anilist-notifications-badge="true"]');
@@ -773,21 +811,27 @@ function init() {
 					badge.setText(label);
 					badge.setCssText([
 						"position:absolute",
-						"top:2px",
-						"right:2px",
+						"top:-4px",
+						"right:-6px",
 						"display:" + (unread > 0 ? "inline-flex" : "none"),
-						"min-width:18px",
+						"width:30px",
+						"min-width:30px",
+						"max-width:none",
 						"height:18px",
-						"padding:0 5px",
+						"padding:0 4px",
+						"box-sizing:border-box",
 						"align-items:center",
 						"justify-content:center",
 						"border-radius:999px",
 						"background:#f8fafc",
 						"color:#0f172a",
 						"border:1px solid rgba(15,23,42,.35)",
-						"font-size:10px",
+						"font-size:9px",
 						"font-weight:900",
 						"line-height:18px",
+						"white-space:nowrap",
+						"overflow:visible",
+						"text-overflow:clip",
 						"z-index:50",
 						"box-shadow:0 2px 8px rgba(0,0,0,.35)",
 						"pointer-events:none",
@@ -820,6 +864,18 @@ function init() {
 							return node && node.closest ? node.closest('a[href], button, [role="button"], [tabindex]') : null;
 						}
 
+						function forceBadgeRoom(node) {
+							for (let current = node, depth = 0; current && depth < 5; current = current.parentElement, depth += 1) {
+								current.style.setProperty('overflow', 'visible', 'important');
+							}
+						}
+
+						function setImportantStyles(node, styles) {
+							Object.keys(styles).forEach(name => {
+								node.style.setProperty(name, styles[name], 'important');
+							});
+						}
+
 						const targets = [];
 						document.querySelectorAll('[data-anilist-notifications-icon="true"], [data-anilist-notifications-dom-badge="true"]').forEach(node => {
 							const target = clickableFrom(node);
@@ -843,8 +899,15 @@ function init() {
 						targets.forEach(target => {
 							if (!target || seen.has(target)) return;
 							seen.add(target);
-							target.style.position = 'relative';
-							target.style.overflow = 'visible';
+							target.style.setProperty('position', 'relative', 'important');
+							target.style.setProperty('overflow', 'visible', 'important');
+							forceBadgeRoom(target);
+							const icon = target.querySelector('[data-anilist-notifications-icon="true"]');
+							if (icon) {
+								icon.style.setProperty('position', 'relative', 'important');
+								icon.style.setProperty('overflow', 'visible', 'important');
+								forceBadgeRoom(icon);
+							}
 
 							let badge = target.querySelector('[data-anilist-notifications-dom-badge="true"]');
 							if (!badge) {
@@ -856,24 +919,58 @@ function init() {
 							badge.textContent = unread > 0 ? label : '';
 							badge.setAttribute('aria-label', aria);
 							badge.style.position = 'absolute';
-							badge.style.top = '2px';
-							badge.style.right = '2px';
+							badge.style.top = '-4px';
+							badge.style.right = '-6px';
 							badge.style.display = unread > 0 ? 'inline-flex' : 'none';
-							badge.style.minWidth = '18px';
+							badge.style.width = '30px';
+							badge.style.minWidth = '30px';
+							badge.style.maxWidth = 'none';
 							badge.style.height = '18px';
-							badge.style.padding = '0 5px';
+							badge.style.padding = '0 4px';
+							badge.style.boxSizing = 'border-box';
 							badge.style.alignItems = 'center';
 							badge.style.justifyContent = 'center';
 							badge.style.borderRadius = '999px';
 							badge.style.background = '#f8fafc';
 							badge.style.color = '#0f172a';
 							badge.style.border = '1px solid rgba(15,23,42,.35)';
-							badge.style.fontSize = '10px';
+							badge.style.fontSize = '9px';
 							badge.style.fontWeight = '900';
 							badge.style.lineHeight = '18px';
+							badge.style.whiteSpace = 'nowrap';
+							badge.style.overflow = 'visible';
+							badge.style.textOverflow = 'clip';
 							badge.style.zIndex = '50';
 							badge.style.boxShadow = '0 2px 8px rgba(0,0,0,.35)';
 							badge.style.pointerEvents = 'none';
+							setImportantStyles(badge, {
+								position: 'absolute',
+								top: '-4px',
+								right: '-6px',
+								display: unread > 0 ? 'inline-flex' : 'none',
+								width: '30px',
+								minWidth: '30px',
+								maxWidth: 'none',
+								height: '18px',
+								padding: '0 4px',
+								boxSizing: 'border-box',
+								alignItems: 'center',
+								justifyContent: 'center',
+								borderRadius: '999px',
+								background: '#f8fafc',
+								color: '#0f172a',
+								border: '1px solid rgba(15,23,42,.35)',
+								fontSize: '9px',
+								fontWeight: '900',
+								lineHeight: '18px',
+								letterSpacing: '0',
+								whiteSpace: 'nowrap',
+								overflow: 'visible',
+								textOverflow: 'clip',
+								zIndex: '50',
+								boxShadow: '0 2px 8px rgba(0,0,0,.35)',
+								pointerEvents: 'none'
+							});
 						});
 
 						if (unread <= 0) {
@@ -910,6 +1007,117 @@ function init() {
 
 		function notificationGlobalIndex(page: number, index: number): number {
 			return Math.max(0, (Number(page || 1) - 1) * NOTIFICATIONS_PER_PAGE + index);
+		}
+
+		function readableUnreadCount(apiUnread: any, resetNotificationCount: boolean): number {
+			if (resetNotificationCount) return 0;
+			return Math.max(0, Number(apiUnread || 0));
+		}
+
+		function unreadDisplayLabel(count: number, capped = false): string {
+			const unread = Math.max(0, Number(count || 0));
+			return capped || unread >= 99 ? "99+" : String(unread);
+		}
+
+		function exactUnreadDisplayLabel(count: number): string {
+			return String(Math.max(0, Number(count || 0)));
+		}
+
+		function setUnreadCount(count: number, label?: string) {
+			const unread = Math.max(0, Number(count || 0));
+			unreadCount.set(unread);
+			unreadCountLabel.set(label || exactUnreadDisplayLabel(unread));
+			void updateSidebarBadge(unread, label);
+		}
+
+		type ReadMarker = {
+			createdAt: number;
+			id: number;
+		};
+
+		function notificationMarker(item: AniListNotification | null | undefined): ReadMarker | null {
+			const createdAt = Math.max(0, Number(item?.createdAt || 0));
+			const id = Math.max(0, Number(item?.id || 0));
+			if (!createdAt && !id) return null;
+			return { createdAt, id };
+		}
+
+		function newestNotificationMarker(items: AniListNotification[]): ReadMarker | null {
+			let marker: ReadMarker | null = null;
+			for (const item of items || []) {
+				const current = notificationMarker(item);
+				if (!current) continue;
+				if (!marker || current.createdAt > marker.createdAt || (current.createdAt === marker.createdAt && current.id > marker.id)) {
+					marker = current;
+				}
+			}
+			return marker;
+		}
+
+		function readStoredReadMarker(): ReadMarker | null {
+			try {
+				const value = $storage.get<ReadMarker>(READ_MARKER_STORAGE_KEY);
+				return notificationMarker(value as any);
+			} catch (_) {
+				return null;
+			}
+		}
+
+		function saveReadMarker(marker: ReadMarker | null) {
+			if (!marker) return;
+			try {
+				$storage.set(READ_MARKER_STORAGE_KEY, marker);
+			} catch (_) {}
+		}
+
+		function saveNewestNotificationAsReadMarker(items: AniListNotification[]) {
+			saveReadMarker(newestNotificationMarker(items));
+		}
+
+		function isNewerThanReadMarker(item: AniListNotification, marker: ReadMarker): boolean {
+			const current = notificationMarker(item);
+			if (!current) return false;
+			return current.createdAt > marker.createdAt || (current.createdAt === marker.createdAt && current.id > marker.id);
+		}
+
+		function countUnreadOnPage(items: AniListNotification[], marker: ReadMarker): { count: number; done: boolean } {
+			let count = 0;
+			for (const item of items || []) {
+				if (isNewerThanReadMarker(item, marker)) {
+					count += 1;
+					continue;
+				}
+				return { count, done: true };
+			}
+			return { count, done: false };
+		}
+
+		async function countUnreadFromStoredReadMarker(firstItems: AniListNotification[], firstPageInfo: any): Promise<number | null> {
+			const marker = readStoredReadMarker();
+			if (!marker) return null;
+
+			let total = 0;
+			let page = 1;
+			let pageInfo = firstPageInfo || {};
+			let items = firstItems || [];
+
+			while (page <= UNREAD_COUNT_SCAN_PAGE_LIMIT) {
+				const counted = countUnreadOnPage(items, marker);
+				total += counted.count;
+				if (counted.done || !pageInfo?.hasNextPage) return total;
+
+				page += 1;
+				if (isAniListRateLimited()) return null;
+
+				const data = await anilistFetch(GET_NOTIFICATION_MARKERS, {
+					page,
+					perPage: NOTIFICATIONS_PER_PAGE,
+				});
+				items = data?.Page?.notifications || [];
+				pageInfo = data?.Page?.pageInfo || {};
+			}
+
+			return null;
 		}
 
 		function shouldPrefetchActivityDetail(item: AniListNotification): boolean {
@@ -986,21 +1194,37 @@ function init() {
 					resetNotificationCount,
 				});
 
-				const unread = resetNotificationCount ? 0 : Number(data?.Viewer?.unreadNotificationCount || 0);
+				const pageInfo = data?.Page?.pageInfo || {};
+				const rawUnread = resetNotificationCount ? 0 : Number(data?.Viewer?.unreadNotificationCount || 0);
 				const viewerId = Number(data?.Viewer?.id || 0);
 				const viewerName = data?.Viewer?.name || "";
-				const items = (data?.Page?.notifications || []).map((item: AniListNotification, index: number) => ({
+				let items = (data?.Page?.notifications || []).map((item: AniListNotification, index: number) => ({
 					...item,
 					viewerId,
 					viewerName,
+					unread: notificationGlobalIndex(page, index) < readableUnreadCount(rawUnread, resetNotificationCount),
+				}));
+				let unread = append ? unreadCount.get() : readableUnreadCount(rawUnread, resetNotificationCount);
+				let unreadLabel = append ? unreadCountLabel.get() : (unread >= 99 && !resetNotificationCount ? unreadDisplayLabel(unread, true) : exactUnreadDisplayLabel(unread));
+
+				if (!append && !resetNotificationCount && rawUnread >= 99) {
+					const trackedUnread = await countUnreadFromStoredReadMarker(items, pageInfo);
+					if (trackedUnread !== null) {
+						unread = trackedUnread;
+						unreadLabel = exactUnreadDisplayLabel(trackedUnread);
+					}
+				}
+				items = items.map((item: AniListNotification, index: number) => ({
+					...item,
 					unread: notificationGlobalIndex(page, index) < unread,
 				}));
-				const pageInfo = data?.Page?.pageInfo || {};
+				if (!append && (resetNotificationCount || unread <= 0)) {
+					saveNewestNotificationAsReadMarker(items);
+				}
 				const toastItems = newUnreadNotifications(items, resetNotificationCount, append);
 
 				notifications.set(append ? mergeNotifications(notifications.get(), items) : items);
-				unreadCount.set(unread);
-				void updateSidebarBadge(unread);
+				setUnreadCount(unread, unreadLabel);
 				hasNextPage.set(!!pageInfo.hasNextPage);
 				currentPage.set(Number(pageInfo.currentPage || page || 1));
 				lastUpdated.set(new Date().toLocaleString());
@@ -1050,8 +1274,9 @@ function init() {
 			if (!target || !target.unread) return false;
 
 			notifications.set(current.map((item) => (item.id === id ? { ...item, unread: false } : item)));
-			unreadCount.set(Math.max(0, unreadCount.get() - 1));
-			void updateSidebarBadge(unreadCount.get());
+			const nextUnread = Math.max(0, unreadCount.get() - 1);
+			const previousLabel = String(unreadCountLabel.get() || "");
+			setUnreadCount(nextUnread, previousLabel.indexOf("+") !== -1 && nextUnread >= 99 ? "99+" : exactUnreadDisplayLabel(nextUnread));
 			return true;
 		}
 
@@ -1059,9 +1284,9 @@ function init() {
 			const current = notifications.get();
 			if (!current.length && unreadCount.get() <= 0) return;
 
+			saveNewestNotificationAsReadMarker(current);
 			notifications.set(current.map((item) => ({ ...item, unread: false })));
-			unreadCount.set(0);
-			void updateSidebarBadge(0);
+			setUnreadCount(0, "0");
 		}
 
 		async function markNotificationRead(id: number) {
@@ -1872,6 +2097,7 @@ function init() {
 						var state = {
 							notifications: [],
 							unreadCount: 0,
+							unreadCountLabel: "0",
 							loading: false,
 							loadingMore: false,
 							hasNextPage: false,
@@ -2476,6 +2702,12 @@ function init() {
 							return link;
 						}
 
+						function pageUnreadBadgeLabel(value, label) {
+							if (label !== undefined && label !== null && String(label).trim()) return String(label).trim();
+							var count = Math.max(0, Number(value || 0));
+							return String(count);
+						}
+
 						function renderHeader(root) {
 							var header = create('div', 'header');
 							var left = create('div', 'header-title-row');
@@ -2489,7 +2721,7 @@ function init() {
 							left.appendChild(copy);
 
 							var actions = create('div', 'header-actions');
-							var badge = create('span', 'badge' + (state.unreadCount > 0 ? '' : ' hidden'), state.unreadCount);
+							var badge = create('span', 'badge' + (state.unreadCount > 0 ? '' : ' hidden'), pageUnreadBadgeLabel(state.unreadCount, state.unreadCountLabel));
 							var refresh = create('button', 'btn btn-primary');
 							refresh.type = 'button';
 							refresh.disabled = !!state.loading;
@@ -2595,6 +2827,7 @@ function init() {
 								if (item.unread) {
 									item.unread = false;
 									state.unreadCount = Math.max(0, Number(state.unreadCount || 0) - 1);
+									state.unreadCountLabel = String(state.unreadCountLabel || '').indexOf('+') !== -1 && state.unreadCount >= 99 ? '99+' : pageUnreadBadgeLabel(state.unreadCount);
 								}
 								render();
 							};
@@ -2879,6 +3112,10 @@ function init() {
 							});
 							window.webview.on('unreadCount', function(value) {
 								state.unreadCount = Number(value || 0);
+								render();
+							});
+							window.webview.on('unreadCountLabel', function(value) {
+								state.unreadCountLabel = value || pageUnreadBadgeLabel(state.unreadCount);
 								render();
 							});
 							window.webview.on('loading', function(value) {

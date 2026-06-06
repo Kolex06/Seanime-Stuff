@@ -18,6 +18,10 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.15
+- Keeps the sidebar unread badge capped at `99+`.
+- Lets the Notifications page show an exact unread count after the plugin has a saved read point.
+
 ### 1.0.14
 - Forces the sidebar unread badge to hide immediately after notifications are marked read.
 
