@@ -11,7 +11,7 @@
   "website": "",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtilsKolex06Version/README.md",
   "lang": "en",
-  "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtilsKolex06Version/provider.ts",
+  "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/46d362884e001c3b1d78bb6cb940f7b7112dd0cb/plugins/SeaUtilsKolex06Version/provider.ts",
   "plugin": {
     "version": "1",
     "permissions": {
