@@ -3531,7 +3531,7 @@ function init() {
                         });
                         const cardText = String(item.innerText || item.textContent || '').toLowerCase();
                         const realLanguageFromText = Array.from(realLanguages.entries()).find(([key]) => {
-                            return new RegExp('(^|[^a-z])' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z]|$)', 'i').test(cardText);
+                            return new RegExp('(^|[^a-z])' + key.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '([^a-z]|$)', 'i').test(cardText);
                         });
                         const programmingLanguage = labelParts.find(label => {
                             return programmingLanguages.has(normalizeGroupToken(label));
