@@ -31,6 +31,11 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.22
+
+- Fixed progress sync being blocked when Seanime/AniList had a score on an unfinished title.
+- Scores are now only sent for scoreable statuses, and progress sync retries without score if the API rejects an early rating.
+
 ### 0.1.21
 
 - Softened the login/settings text input borders so `Username` and `AsunaTracks URL` no longer look like warning fields.

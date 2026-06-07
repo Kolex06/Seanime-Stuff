@@ -317,6 +317,16 @@ function init() {
 			return Math.floor(value);
 		}
 
+		function canSendScore(status?: string) {
+			return ["completed", "rewatched", "reread", "rewatching", "rereading"].includes(String(status ?? "").toLowerCase());
+		}
+
+		function removeScore(body: AsunaTracksPayload) {
+			delete body.score;
+			delete body.score_10;
+			return body;
+		}
+
 		function anilistEntries(type: MediaType): AniListEntry[] {
 			const collection =
 				type === "anime"
@@ -344,7 +354,7 @@ function init() {
 		function payloadFromEntry(type: MediaType, entry: AniListEntry, overrides: Partial<AsunaTracksPayload> = {}): AsunaTracksPayload | null {
 			const malId = unwrap(entry.media?.idMal);
 			if (!malId) return null;
-			return {
+			const body: AsunaTracksPayload = {
 				media_type: type,
 				mal_id: malId,
 				status: normalizeStatus(type, entry.status),
@@ -358,6 +368,7 @@ function init() {
 				finish_date: toISODate(entry.completedAt),
 				...overrides,
 			};
+			return canSendScore(body.status) ? body : removeScore(body);
 		}
 		function readableKey(value: string) {
 			return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -403,10 +414,21 @@ function init() {
 				return;
 			}
 
-			await api("/public/api/me/list", {
-				method: "POST",
-				body: JSON.stringify(body),
-			});
+			try {
+				await api("/public/api/me/list", {
+					method: "POST",
+					body: JSON.stringify(body),
+				});
+			} catch (err) {
+				const message = (err as Error).message;
+				if (!/finish this title before giving it a score/i.test(message)) throw err;
+				log.push("Warning", `${reason}: score rejected before completion, retrying progress sync without score`);
+				removeScore(body);
+				await api("/public/api/me/list", {
+					method: "POST",
+					body: JSON.stringify(body),
+				});
+			}
 			log.push("Success", `${reason}: synced ${entry.media?.title?.userPreferred ?? body.mal_id}`);
 			notifySync(`Updated ${entry.media?.title?.userPreferred ?? body.mal_id}`, entry, {
 				Action: reason,
