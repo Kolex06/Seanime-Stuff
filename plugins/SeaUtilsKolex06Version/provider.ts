@@ -3462,11 +3462,8 @@ function init() {
 
                     function getCatalogGroupingLabel(item, fallbackTitle) {
                         const data = getExtensionCardData(item);
-                        const language = data.language || '';
                         const author = data.author || '';
 
-                        if (language && author) return language + ' - ' + author;
-                        if (language) return language;
                         if (author) return author;
 
                         return fallbackTitle || 'Unknown';
