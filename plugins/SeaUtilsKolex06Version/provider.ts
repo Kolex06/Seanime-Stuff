@@ -3460,6 +3460,42 @@ function init() {
                         return Array.from(grouped.values()).sort((a, b) => a.title.localeCompare(b.title));
                     }
 
+                    function getCatalogGroupingLabel(item, fallbackTitle) {
+                        const data = getExtensionCardData(item);
+                        const language = data.language || '';
+                        const author = data.author || '';
+
+                        if (language && author) return language + ' - ' + author;
+                        if (language) return language;
+                        if (author) return author;
+
+                        return fallbackTitle || 'Unknown';
+                    }
+
+                    function groupMarketplaceItemsForViewAll(section) {
+                        const grouped = new Map();
+                        const fallbackTitle = section && section.title ? section.title : 'Full Catalog';
+
+                        if (!section || !Array.isArray(section.items)) return [];
+
+                        section.items.forEach(item => {
+                            const title = getCatalogGroupingLabel(item, fallbackTitle);
+
+                            if (!grouped.has(title)) {
+                                grouped.set(title, {
+                                    title,
+                                    card: section.card,
+                                    grid: section.grid,
+                                    items: [],
+                                });
+                            }
+
+                            grouped.get(title).items.push(item);
+                        });
+
+                        return Array.from(grouped.values()).sort((a, b) => a.title.localeCompare(b.title));
+                    }
+
                     function appendCatalogCards(rowGrid, items, isInstalledCatalog) {
                         items.forEach(item => {
                             const clone = item.cloneNode(true);
@@ -3677,12 +3713,14 @@ function init() {
                         };
 
                         viewBtn.onclick = () => {
-                            openFullCatalogModal([{
+                            const section = {
                                 title: titleEl.textContent.trim() || 'Full Catalog',
                                 card,
                                 grid,
                                 items: Array.from(grid.querySelectorAll('.group\\\\/extension-card')),
-                            }], 'Full Catalog');
+                            };
+
+                            openFullCatalogModal(groupMarketplaceItemsForViewAll(section), 'Full Catalog');
                         };
 
                     }
