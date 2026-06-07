@@ -6,7 +6,7 @@
   "language": "typescript",
   "type": "plugin",
   "description": "Live-sync Seanime/AniList anime and manga progress to AsunaTracks, with manual full-library sync when you need to catch up.",
-  "author": "AsunaTracks",
+  "author": "Kolex06",
   "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/asunatracks-logo.png",
   "website": "https://asunatracks.space",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AsunaTracksSync/README.md",
