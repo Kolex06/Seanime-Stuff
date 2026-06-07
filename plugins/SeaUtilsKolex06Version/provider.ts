@@ -3436,10 +3436,10 @@ function init() {
                         }).filter(Boolean);
                     }
 
-                    function getAuthorFullCatalogSections() {
+                    function groupMarketplaceSectionsByAuthor(sections) {
                         const grouped = new Map();
 
-                        getMarketplaceSections().forEach(section => {
+                        (sections || []).forEach(section => {
                             section.items.forEach(item => {
                                 const data = getExtensionCardData(item);
                                 const author = data.author || 'Unknown';
@@ -3458,6 +3458,10 @@ function init() {
                         });
 
                         return Array.from(grouped.values()).sort((a, b) => a.title.localeCompare(b.title));
+                    }
+
+                    function getAuthorFullCatalogSections() {
+                        return groupMarketplaceSectionsByAuthor(getMarketplaceSections());
                     }
 
                     function appendCatalogCards(rowGrid, items, isInstalledCatalog) {
@@ -3677,12 +3681,14 @@ function init() {
                         };
 
                         viewBtn.onclick = () => {
-                            openFullCatalogModal([{
+                            const section = {
                                 title: titleEl.textContent.trim() || 'Full Catalog',
                                 card,
                                 grid,
                                 items: Array.from(grid.querySelectorAll('.group\\\\/extension-card')),
-                            }], 'Full Catalog');
+                            };
+
+                            openFullCatalogModal(groupMarketplaceSectionsByAuthor([section]), 'Full Catalog');
                         };
 
                     }

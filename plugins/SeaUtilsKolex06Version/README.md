@@ -37,6 +37,10 @@ The Full Catalog popup keeps extension actions close to each card:
 
 ## Version History
 
+### 1.2.70
+- Made per-section View All popups group rows like Full Catalog.
+- Keeps grouping focused on real authors and skips language metadata such as English, JavaScript, and TypeScript.
+
 ### 1.2.69
 - Added a separate Carousels: Extensions setting.
 - Better Marketplace now controls whether the Extensions carousel setting is active.
