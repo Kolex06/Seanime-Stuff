@@ -3510,10 +3510,11 @@ function init() {
                             'swift',
                             'lua',
                         ]);
-                        const author = data.author || '';
                         const normalizeGroupToken = (value) => {
                             return String(value || '').trim().toLowerCase();
                         };
+                        const author = data.author || '';
+                        const versionText = normalizeGroupToken(data.version || '');
                         const getLabelParts = (value) => {
                             return String(value || '')
                                 .split(/\s*(?:-|\/|,|\||•|·|:|;|\(|\))\s*/g)
@@ -3523,7 +3524,7 @@ function init() {
                         const languageCandidates = badges.filter(label => {
                             const normalized = normalizeGroupToken(label);
 
-                            return normalized && normalized !== author.toLowerCase();
+                            return normalized && normalized !== versionText;
                         });
                         const labelParts = languageCandidates.flatMap(getLabelParts);
                         const realLanguage = labelParts.find(label => {
