@@ -3460,116 +3460,6 @@ function init() {
                         return Array.from(grouped.values()).sort((a, b) => a.title.localeCompare(b.title));
                     }
 
-                    function getCatalogGroupingLabel(item, fallbackTitle) {
-                        const data = getExtensionCardData(item);
-                        const badges = Array.from(item.querySelectorAll('.UI-Badge__root')).map(badge => badge.textContent.trim()).filter(Boolean);
-                        const realLanguages = new Map([
-                            ['english', 'English'],
-                            ['en', 'English'],
-                            ['japanese', 'Japanese'],
-                            ['jp', 'Japanese'],
-                            ['ja', 'Japanese'],
-                            ['korean', 'Korean'],
-                            ['ko', 'Korean'],
-                            ['chinese', 'Chinese'],
-                            ['zh', 'Chinese'],
-                            ['spanish', 'Spanish'],
-                            ['es', 'Spanish'],
-                            ['french', 'French'],
-                            ['fr', 'French'],
-                            ['german', 'German'],
-                            ['de', 'German'],
-                            ['italian', 'Italian'],
-                            ['it', 'Italian'],
-                            ['portuguese', 'Portuguese'],
-                            ['pt', 'Portuguese'],
-                            ['russian', 'Russian'],
-                            ['русский', 'Russian'],
-                            ['рус', 'Russian'],
-                            ['ru', 'Russian'],
-                            ['polish', 'Polish'],
-                            ['pl', 'Polish'],
-                            ['turkish', 'Turkish'],
-                            ['tr', 'Turkish'],
-                            ['multi', 'Multi'],
-                            ['multilingual', 'Multi'],
-                        ]);
-                        const programmingLanguages = new Set([
-                            'javascript',
-                            'typescript',
-                            'go',
-                            'golang',
-                            'python',
-                            'rust',
-                            'java',
-                            'c#',
-                            'c++',
-                            'php',
-                            'ruby',
-                            'kotlin',
-                            'swift',
-                            'lua',
-                        ]);
-                        const normalizeGroupToken = (value) => {
-                            return String(value || '').trim().toLowerCase();
-                        };
-                        const author = data.author || '';
-                        const versionText = normalizeGroupToken(data.version || '');
-                        const getLabelParts = (value) => {
-                            return String(value || '')
-                                .split(/\s*(?:-|\/|,|\||•|·|:|;|\(|\))\s*/g)
-                                .map(part => part.trim())
-                                .filter(Boolean);
-                        };
-                        const languageCandidates = badges.filter(label => {
-                            const normalized = normalizeGroupToken(label);
-
-                            return normalized && normalized !== versionText;
-                        });
-                        const labelParts = languageCandidates.flatMap(getLabelParts);
-                        const realLanguage = labelParts.find(label => {
-                            return realLanguages.has(normalizeGroupToken(label));
-                        });
-                        const cardText = String(item.innerText || item.textContent || '').toLowerCase();
-                        const realLanguageFromText = Array.from(realLanguages.entries()).find(([key]) => {
-                            return new RegExp('(^|[^a-z])' + key.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '([^a-z]|$)', 'i').test(cardText);
-                        });
-                        const programmingLanguage = labelParts.find(label => {
-                            return programmingLanguages.has(normalizeGroupToken(label));
-                        });
-
-                        if (realLanguage) return realLanguages.get(normalizeGroupToken(realLanguage)) || realLanguage;
-                        if (realLanguageFromText) return realLanguageFromText[1];
-                        if (programmingLanguage) return programmingLanguage;
-                        if (author) return author;
-
-                        return fallbackTitle || 'Unknown';
-                    }
-
-                    function groupMarketplaceItemsForViewAll(section) {
-                        const grouped = new Map();
-                        const fallbackTitle = section && section.title ? section.title : 'Full Catalog';
-
-                        if (!section || !Array.isArray(section.items)) return [];
-
-                        section.items.forEach(item => {
-                            const title = getCatalogGroupingLabel(item, fallbackTitle);
-
-                            if (!grouped.has(title)) {
-                                grouped.set(title, {
-                                    title,
-                                    card: section.card,
-                                    grid: section.grid,
-                                    items: [],
-                                });
-                            }
-
-                            grouped.get(title).items.push(item);
-                        });
-
-                        return Array.from(grouped.values()).sort((a, b) => a.title.localeCompare(b.title));
-                    }
-
                     function appendCatalogCards(rowGrid, items, isInstalledCatalog) {
                         items.forEach(item => {
                             const clone = item.cloneNode(true);
@@ -3787,14 +3677,12 @@ function init() {
                         };
 
                         viewBtn.onclick = () => {
-                            const section = {
+                            openFullCatalogModal([{
                                 title: titleEl.textContent.trim() || 'Full Catalog',
                                 card,
                                 grid,
                                 items: Array.from(grid.querySelectorAll('.group\\\\/extension-card')),
-                            };
-
-                            openFullCatalogModal(groupMarketplaceItemsForViewAll(section), 'Full Catalog');
+                            }], 'Full Catalog');
                         };
 
                     }

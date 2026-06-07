@@ -1,7 +1,7 @@
 {
   "id": "SeaUtils-Kolex06-Version",
   "name": "SeaUtils Kolex06-Version",
-  "version": "1.2.70",
+  "version": "1.2.69",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtils-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
@@ -11,7 +11,7 @@
   "website": "",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtilsKolex06Version/README.md",
   "lang": "en",
-  "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/51bf3990bba15ec539fb5c97d7e3fc431dddaef8/plugins/SeaUtilsKolex06Version/provider.ts",
+  "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/SeaUtilsKolex06Version/provider.ts",
   "plugin": {
     "version": "1",
     "permissions": {
