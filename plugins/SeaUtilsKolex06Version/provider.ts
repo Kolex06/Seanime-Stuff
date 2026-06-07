@@ -3462,8 +3462,38 @@ function init() {
 
                     function getCatalogGroupingLabel(item, fallbackTitle) {
                         const data = getExtensionCardData(item);
+                        const badges = Array.from(item.querySelectorAll('.UI-Badge__root')).map(badge => badge.textContent.trim()).filter(Boolean);
+                        const programmingLanguages = new Set([
+                            'javascript',
+                            'typescript',
+                            'go',
+                            'golang',
+                            'python',
+                            'rust',
+                            'java',
+                            'c#',
+                            'c++',
+                            'php',
+                            'ruby',
+                            'kotlin',
+                            'swift',
+                            'lua',
+                        ]);
                         const author = data.author || '';
+                        const languageCandidates = badges.slice(2).filter(label => {
+                            const normalized = String(label || '').trim().toLowerCase();
 
+                            return normalized && normalized !== author.toLowerCase();
+                        });
+                        const realLanguage = languageCandidates.find(label => {
+                            return !programmingLanguages.has(String(label || '').trim().toLowerCase());
+                        });
+                        const programmingLanguage = languageCandidates.find(label => {
+                            return programmingLanguages.has(String(label || '').trim().toLowerCase());
+                        });
+
+                        if (realLanguage) return realLanguage;
+                        if (programmingLanguage) return programmingLanguage;
                         if (author) return author;
 
                         return fallbackTitle || 'Unknown';

@@ -38,7 +38,7 @@ The Full Catalog popup keeps extension actions close to each card:
 ## Version History
 
 ### 1.2.70
-- Updated per-section View All / Full Catalog popups to group marketplace cards by author instead of showing one flat section row.
+- Updated per-section View All / Full Catalog popups to group marketplace cards by real language, falling back to programming language only when no real language is available.
 
 ### 1.2.69
 - Added a separate Carousels: Extensions setting.
