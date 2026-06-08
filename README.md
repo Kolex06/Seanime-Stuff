@@ -123,13 +123,13 @@ Features include:
 Direct manifest:
 
 ```text
-https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher%20Kolex06Version.json
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Account-Switcher-Kolex06-Version.json
 ```
 
 Documentation:
 
 ```text
-https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher%20Kolex06Version/README.md
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcherKolex06Version/README.md
 ```
 
 Icon:
@@ -184,10 +184,10 @@ plugins/
   AniListNotificationsKolex06Version/
     README.md
     provider.ts
-  AccountSwitcher Kolex06Version/
+  AccountSwitcherKolex06Version/
     README.md
     provider.ts
-  AccountSwitcher Kolex06Version.json
+  Account-Switcher-Kolex06-Version.json
   SeaUtils-Kolex06-Version.json
   SeaUtilsKolex06Version/
     README.md
