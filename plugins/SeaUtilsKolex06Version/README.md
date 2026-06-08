@@ -2,8 +2,6 @@
 
 SeaUtils Kolex06-Version is a Seanime utility extension by Kolex06. It improves the Extensions marketplace, adds better catalog popups, gives media grids optional carousel behavior, and adds small quality-of-life badges for anime cards.
 
-Version `1.2.72` keeps the working marketplace and carousel behavior from `1.2.71`, then fixes Broken/Deprecated status sections so they use normal cards when Carousels: Extensions is off.
-
 ## Features
 
 - Better Marketplace layout with searchable rows and a Full Catalog popup.
