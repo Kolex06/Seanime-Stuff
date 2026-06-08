@@ -123,13 +123,19 @@ Features include:
 Direct manifest:
 
 ```text
-https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher.json
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher%20Kolex06Version.json
 ```
 
 Documentation:
 
 ```text
-https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher/README.md
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher%20Kolex06Version/README.md
+```
+
+Icon:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/account-switcher.png
 ```
 
 ## AsunaTracks Sync
@@ -178,10 +184,10 @@ plugins/
   AniListNotificationsKolex06Version/
     README.md
     provider.ts
-  AccountSwitcher/
+  AccountSwitcher Kolex06Version/
     README.md
     provider.ts
-  AccountSwitcher.json
+  AccountSwitcher Kolex06Version.json
   SeaUtils-Kolex06-Version.json
   SeaUtilsKolex06Version/
     README.md
@@ -192,7 +198,7 @@ plugins/
     provider.ts
 icons/
   AniList-Notifications-Kolex06-Version.png
-  account-switcher.svg
+  account-switcher.png
   SeaUtils-Kolex06-Version.png
   asunatracks.png
 ```
