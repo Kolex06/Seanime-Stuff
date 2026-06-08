@@ -61,9 +61,9 @@ Virus scan metadata is informational only. You should still review extensions yo
 ## Version History
 
 ### 1.2.72
-- Fixes Broken/Deprecated Extensions sections so they use normal grid-style cards when Carousels: Extensions is off.
+- Fixes Broken/Deprecated Extensions sections so they use normal grid-style when Carousels: Extensions is off.
 - Keeps Broken/Deprecated Extensions sections in carousel mode when Carousels: Extensions is on.
-- Gates drag behavior for those status sections through the Carousels: Extensions setting.
+- Stops drag behavior for Broken/Deprecated Extensions sections when the Carousels: Extensions setting is off.
 
 ### 1.2.71
 - Adds the optional Bas1874 Marketplace metadata setting.
