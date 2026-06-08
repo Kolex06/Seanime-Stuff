@@ -44,7 +44,7 @@
   {
     "id": "Watch-Next-Kolex06-Version",
     "name": "Watch Next Kolex06-Version",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json",
     "language": "typescript",
     "type": "plugin",

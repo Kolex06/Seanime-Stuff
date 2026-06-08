@@ -1,7 +1,7 @@
 {
   "id": "Watch-Next-Kolex06-Version",
   "name": "Watch Next Kolex06-Version",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
@@ -10,7 +10,7 @@
   "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/Watch-Next-Kolex06-Version.png",
   "website": "",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/README.md",
-  "notes": "Sidebar-only build. Open Watch Next from the Seanime sidebar. Add anime from AniList, drag rows to reorder, and keep an AniList custom list named Watch Next synced automatically in the same visible order, including entries that were already on AniList.",
+  "notes": "Sidebar-only build. Open Watch Next from the Seanime sidebar. Drag rows by the handle, sync to an AniList custom list named Watch Next, and avoid AniList 429s by only updating changed entries with safer request pacing.",
   "lang": "en",
   "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/provider.ts",
   "plugin": {

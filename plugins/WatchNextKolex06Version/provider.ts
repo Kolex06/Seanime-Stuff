@@ -43,7 +43,9 @@ function init() {
 		const isSyncingAniList = ctx.state<boolean>(false);
 		const aniListSyncStatus = ctx.state<string>("");
 		const aniListCustomListName = "Watch Next";
+		const aniListRequestSpacingMs = 2200;
 		let pendingAutoSyncCancel: (() => void) | null = null;
+		let lastAniListRequestAt = 0;
 
 		const sidebarIcon = '<span style="display:inline-flex;width:24px;height:24px;align-items:center;justify-content:center;color:currentColor"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5h11"></path><path d="M5 5h.01"></path><path d="M8 12h11"></path><path d="M5 12h.01"></path><path d="M8 19h11"></path><path d="M5 19h.01"></path></svg></span>';
 
@@ -209,6 +211,13 @@ function init() {
 			});
 		}
 
+		async function waitForAniListRateSlot() {
+			if (!lastAniListRequestAt) return;
+			const elapsed = Date.now() - lastAniListRequestAt;
+			const remaining = aniListRequestSpacingMs - elapsed;
+			if (remaining > 0) await waitForAniListOrderStep(remaining);
+		}
+
 		async function openAddView() {
 			currentView.set("add");
 			isLoading.set(true);
@@ -346,31 +355,79 @@ function init() {
 			return String(token);
 		}
 
+		function responseHeader(response: any, name: string): string | null {
+			try {
+				return response?.headers?.get ? response.headers.get(name) : null;
+			} catch (_) {
+				return null;
+			}
+		}
+
+		function rateLimitDelayFromResponse(response: any) {
+			const retryAfter = Number(responseHeader(response, "Retry-After"));
+			if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.ceil(retryAfter * 1000) + 1000;
+
+			const resetAt = Number(responseHeader(response, "X-RateLimit-Reset"));
+			if (Number.isFinite(resetAt) && resetAt > 0) {
+				return Math.max(Math.ceil(resetAt * 1000 - Date.now()) + 1000, 5000);
+			}
+
+			return 65000;
+		}
+
+		async function waitForAniListRetry(response: any) {
+			const waitMs = rateLimitDelayFromResponse(response);
+			const seconds = Math.max(1, Math.ceil(waitMs / 1000));
+			aniListSyncStatus.set("AniList rate limit hit. Waiting " + seconds + "s, then retrying...");
+			sendSnapshot();
+			await waitForAniListOrderStep(waitMs);
+		}
+
 		async function aniListFetch(query: string, variables: Record<string, any> = {}) {
 			const token = getAniListToken();
-			const res = await ctx.fetch("https://graphql.anilist.co", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: "Bearer " + token,
-				},
-				body: JSON.stringify({ query, variables }),
-			});
 
-			if (!res.ok) {
-				let detail = "";
-				try {
-					detail = await res.text();
-				} catch (_) {}
-				throw new Error("AniList returned HTTP " + res.status + (detail ? ": " + detail.slice(0, 160) : ""));
+			for (let attempt = 0; attempt < 2; attempt++) {
+				await waitForAniListRateSlot();
+				lastAniListRequestAt = Date.now();
+
+				const res = await ctx.fetch("https://graphql.anilist.co", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: "Bearer " + token,
+					},
+					body: JSON.stringify({ query, variables }),
+				});
+
+				if (!res.ok) {
+					let detail = "";
+					try {
+						detail = await res.text();
+					} catch (_) {}
+
+					if (res.status === 429 && attempt === 0) {
+						await waitForAniListRetry(res);
+						continue;
+					}
+
+					throw new Error("AniList returned HTTP " + res.status + (detail ? ": " + detail.slice(0, 160) : ""));
+				}
+
+				const json = await res.json();
+				if (json.errors && json.errors.length) {
+					const firstError = json.errors[0] || {};
+					if (Number(firstError.status) === 429 && attempt === 0) {
+						await waitForAniListRetry(res);
+						continue;
+					}
+
+					throw new Error(firstError.message || "AniList returned an error.");
+				}
+
+				return json.data;
 			}
 
-			const json = await res.json();
-			if (json.errors && json.errors.length) {
-				throw new Error(json.errors[0].message || "AniList returned an error.");
-			}
-
-			return json.data;
+			throw new Error("AniList is still rate limiting requests. Wait a minute, then sync again.");
 		}
 
 		function normalizeCustomLists(value: any): string[] {
@@ -568,25 +625,39 @@ function init() {
 				let created = 0;
 				let ordered = 0;
 
-				for (const anime of orderedList.get()) {
+				const orderedQueue = orderedList.get().filter((anime) => Number(anime.id) > 0);
+				const orderWork: Array<{
+					mediaId: number;
+					nextLists: string[];
+					status?: string;
+					priority: number;
+					entry: any;
+					hasWatchNext: boolean;
+					needsPriority: boolean;
+				}> = [];
+
+				orderedQueue.forEach((anime, index) => {
 					const mediaId = Number(anime.id);
-					if (!mediaId) continue;
+					if (!mediaId) return;
+					const priority = orderedQueue.length - index;
 
 					const entry = byMediaId.get(mediaId);
 					const currentLists = currentCustomListsForMedia(mediaId, entry);
 					const hasWatchNext = existingWatchNextIds.has(mediaId) || currentLists.some((name) => name === aniListCustomListName);
-					if (hasWatchNext) continue;
-
 					const nextLists = uniqueStringList([...currentLists, aniListCustomListName]);
-					await saveAniListEntryCustomLists(mediaId, nextLists, entry ? undefined : "PLANNING");
-					customListsByMediaId.set(mediaId, nextLists);
-					if (!entry) byMediaId.set(mediaId, { mediaId, customLists: nextLists });
-					if (entry) {
-						added++;
-					} else {
-						created++;
+					const needsPriority = Number(entry?.priority || 0) !== priority;
+					if (!hasWatchNext || needsPriority) {
+						orderWork.push({
+							mediaId,
+							nextLists,
+							status: entry ? undefined : "PLANNING",
+							priority,
+							entry,
+							hasWatchNext,
+							needsPriority,
+						});
 					}
-				}
+				});
 
 				for (const mediaId of Array.from(existingWatchNextIds.values())) {
 					if (queuedIds.has(mediaId)) continue;
@@ -601,24 +672,23 @@ function init() {
 					removed++;
 				}
 
-				const orderedQueue = orderedList.get().filter((anime) => Number(anime.id) > 0);
-				const orderDelayMs = orderedQueue.length > 20 ? 2100 : 1150;
-				for (let index = orderedQueue.length - 1; index >= 0; index--) {
-					const mediaId = Number(orderedQueue[index]?.id || 0);
-					if (!mediaId) continue;
-					const priority = orderedQueue.length - index;
-
-					const entry = byMediaId.get(mediaId);
-					const currentLists = currentCustomListsForMedia(mediaId, entry);
-					const nextLists = uniqueStringList([...currentLists, aniListCustomListName]);
-					if (ordered > 0) await waitForAniListOrderStep(orderDelayMs);
-
-					aniListSyncStatus.set("Ordering AniList Watch Next " + (ordered + 1) + "/" + orderedQueue.length + "...");
+				for (let index = orderWork.length - 1; index >= 0; index--) {
+					const item = orderWork[index];
+					const progress = orderWork.length - index;
+					aniListSyncStatus.set("Updating AniList Watch Next " + progress + "/" + orderWork.length + "...");
 					sendSnapshot();
-					await saveAniListEntryCustomLists(mediaId, nextLists, undefined, priority);
-					customListsByMediaId.set(mediaId, nextLists);
-					byMediaId.set(mediaId, { ...(entry || {}), mediaId, customLists: nextLists, priority });
-					ordered++;
+
+					await saveAniListEntryCustomLists(item.mediaId, item.nextLists, item.status, item.priority);
+					customListsByMediaId.set(item.mediaId, item.nextLists);
+					byMediaId.set(item.mediaId, { ...(item.entry || {}), mediaId: item.mediaId, customLists: item.nextLists, priority: item.priority });
+					existingWatchNextIds.add(item.mediaId);
+
+					if (!item.entry) {
+						created++;
+					} else if (!item.hasWatchNext) {
+						added++;
+					}
+					if (item.needsPriority) ordered++;
 				}
 
 				const message = madeListVisible || added || created || removed || ordered

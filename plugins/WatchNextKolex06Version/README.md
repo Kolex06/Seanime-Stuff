@@ -11,6 +11,7 @@ Kolex06-styled Seanime plugin for building a personal Watch Next anime queue.
 - Up/down buttons remain available as a fallback.
 - Auto-sync queued anime into an AniList custom list named Watch Next in queue order.
 - Uses AniList priority updates so already-listed anime are reordered too.
+- Skips unchanged AniList entries and spaces requests to reduce 429 rate-limit errors.
 - Manual Sync AniList List button for forcing a refresh.
 - Optional auto-remove when an anime moves to your CURRENT list.
 - Migrates the original Watch Next extension storage keys on first load.
