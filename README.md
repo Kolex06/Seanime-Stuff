@@ -21,6 +21,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 | SeaUtils Kolex06-Version | 1.2.72 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
 | AniList Notifications Kolex06-Version | 1.0.15 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
 | Account Switcher Kolex06-Version | 1.0.9 | `Account-Switcher-Kolex06-Version` | AniList account switcher moved from the tray into Seanime's avatar dropdown menu. |
+| Watch Next Kolex06-Version | 1.0.0 | `Watch-Next-Kolex06-Version` | Kolex06-styled sidebar Watch Next queue with AniList imports, drag-and-drop anime ordering, and automatic AniList custom-list sync in queue order. |
 | AsunaTracks Sync | 0.1.22 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
@@ -138,6 +139,41 @@ Icon:
 https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/account-switcher.png
 ```
 
+## Watch Next Kolex06-Version
+
+Watch Next Kolex06-Version adds a personal queue for deciding what anime to watch next.
+
+Features include:
+
+- Sidebar page.
+- Add anime from AniList lists.
+- Search, list, year, season, and added-time filters.
+- Drag-and-drop queue ordering.
+- Up/down buttons for keyboard or fallback ordering.
+- Auto-sync queued anime into an AniList custom list named Watch Next in queue order.
+- Uses AniList priority updates so already-listed anime are reordered too.
+- Manual Sync AniList List button for forcing a refresh.
+- Optional auto-remove when queued anime moves to CURRENT.
+- Migration from the original Watch Next storage keys on first load.
+
+Direct manifest:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json
+```
+
+Documentation:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/README.md
+```
+
+Icon:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/Watch-Next-Kolex06-Version.png
+```
+
 ## AsunaTracks Sync
 
 AsunaTracks Sync connects Seanime/AniList progress with AsunaTracks.
@@ -188,6 +224,10 @@ plugins/
     README.md
     provider.ts
   Account-Switcher-Kolex06-Version.json
+  Watch-Next-Kolex06-Version.json
+  WatchNextKolex06Version/
+    README.md
+    provider.ts
   SeaUtils-Kolex06-Version.json
   SeaUtilsKolex06Version/
     README.md
@@ -199,6 +239,7 @@ plugins/
 icons/
   AniList-Notifications-Kolex06-Version.png
   account-switcher.png
+  Watch-Next-Kolex06-Version.png
   SeaUtils-Kolex06-Version.png
   asunatracks.png
 ```
