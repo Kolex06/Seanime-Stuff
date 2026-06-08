@@ -625,40 +625,6 @@ function init() {
 				let created = 0;
 				let ordered = 0;
 
-				const orderedQueue = orderedList.get().filter((anime) => Number(anime.id) > 0);
-				const orderWork: Array<{
-					mediaId: number;
-					nextLists: string[];
-					status?: string;
-					priority: number;
-					entry: any;
-					hasWatchNext: boolean;
-					needsPriority: boolean;
-				}> = [];
-
-				orderedQueue.forEach((anime, index) => {
-					const mediaId = Number(anime.id);
-					if (!mediaId) return;
-					const priority = orderedQueue.length - index;
-
-					const entry = byMediaId.get(mediaId);
-					const currentLists = currentCustomListsForMedia(mediaId, entry);
-					const hasWatchNext = existingWatchNextIds.has(mediaId) || currentLists.some((name) => name === aniListCustomListName);
-					const nextLists = uniqueStringList([...currentLists, aniListCustomListName]);
-					const needsPriority = Number(entry?.priority || 0) !== priority;
-					if (!hasWatchNext || needsPriority) {
-						orderWork.push({
-							mediaId,
-							nextLists,
-							status: entry ? undefined : "PLANNING",
-							priority,
-							entry,
-							hasWatchNext,
-							needsPriority,
-						});
-					}
-				});
-
 				for (const mediaId of Array.from(existingWatchNextIds.values())) {
 					if (queuedIds.has(mediaId)) continue;
 
@@ -672,23 +638,32 @@ function init() {
 					removed++;
 				}
 
-				for (let index = orderWork.length - 1; index >= 0; index--) {
-					const item = orderWork[index];
-					const progress = orderWork.length - index;
-					aniListSyncStatus.set("Updating AniList Watch Next " + progress + "/" + orderWork.length + "...");
+				const orderedQueue = orderedList.get().filter((anime) => Number(anime.id) > 0);
+				for (let index = orderedQueue.length - 1; index >= 0; index--) {
+					const mediaId = Number(orderedQueue[index]?.id || 0);
+					if (!mediaId) continue;
+					const priority = orderedQueue.length - index;
+					const progress = orderedQueue.length - index;
+
+					const entry = byMediaId.get(mediaId);
+					const currentLists = currentCustomListsForMedia(mediaId, entry);
+					const hasWatchNext = existingWatchNextIds.has(mediaId) || currentLists.some((name) => name === aniListCustomListName);
+					const nextLists = uniqueStringList([...currentLists, aniListCustomListName]);
+
+					aniListSyncStatus.set("Ordering AniList Watch Next " + progress + "/" + orderedQueue.length + "...");
 					sendSnapshot();
 
-					await saveAniListEntryCustomLists(item.mediaId, item.nextLists, item.status, item.priority);
-					customListsByMediaId.set(item.mediaId, item.nextLists);
-					byMediaId.set(item.mediaId, { ...(item.entry || {}), mediaId: item.mediaId, customLists: item.nextLists, priority: item.priority });
-					existingWatchNextIds.add(item.mediaId);
+					await saveAniListEntryCustomLists(mediaId, nextLists, entry ? undefined : "PLANNING", priority);
+					customListsByMediaId.set(mediaId, nextLists);
+					byMediaId.set(mediaId, { ...(entry || {}), mediaId, customLists: nextLists, priority });
+					existingWatchNextIds.add(mediaId);
 
-					if (!item.entry) {
+					if (!entry) {
 						created++;
-					} else if (!item.hasWatchNext) {
+					} else if (!hasWatchNext) {
 						added++;
 					}
-					if (item.needsPriority) ordered++;
+					ordered++;
 				}
 
 				const message = madeListVisible || added || created || removed || ordered
