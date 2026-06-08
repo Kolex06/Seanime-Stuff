@@ -114,13 +114,6 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/An
 
 Account Switcher Kolex06-Version lets you save multiple AniList access tokens and switch between them directly from the Seanime avatar dropdown menu.
 
-Version info:
-
-- Current version: `1.0.9`
-- Manifest file: `plugins/Account-Switcher-Kolex06-Version.json`
-- Source folder: `plugins/AccountSwitcherKolex06Version/`
-- Icon: `icons/account-switcher.png`
-
 Features include:
 
 - Avatar-menu controls above `Sign out`.
@@ -164,11 +157,19 @@ Features include:
 - Optional auto-remove when queued anime moves to CURRENT.
 - Migration from the original Watch Next storage keys on first load.
 
-Version info:
+### Version History
 
-- `1.0.2` - Reduced AniList `429 Too Many Requests` errors by skipping unchanged entries, spacing AniList writes, and retrying once after rate-limit waits.
-- `1.0.1` - Fixed Seanime webview drag ordering with a dedicated drag handle and pointer-based reorder logic.
-- `1.0.0` - Initial GitHub release of Watch Next Kolex06-Version.
+#### 1.0.2
+
+- Reduced AniList `429 Too Many Requests` errors by skipping unchanged entries, spacing AniList writes, and retrying once after rate-limit waits.
+
+#### 1.0.1
+
+- Fixed Seanime webview drag ordering with a dedicated drag handle and pointer-based reorder logic.
+
+#### 1.0.0
+
+- Initial GitHub release of Watch Next Kolex06-Version.
 
 Direct manifest:
 
