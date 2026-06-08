@@ -20,6 +20,10 @@ Kolex06-styled Seanime plugin for building a personal Watch Next anime queue.
 
 ## Version History
 
+### 1.0.5
+
+- Swapped the Move down and Open anime row action positions.
+
 ### 1.0.4
 
 - Changed the Watch Next row Open and Remove actions to compact icon buttons with hover labels.

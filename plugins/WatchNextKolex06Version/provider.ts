@@ -1710,14 +1710,14 @@ function init() {
 								event.stopPropagation();
 								moveAnime(anime.id, -1);
 							}, "Move up"));
-							actions.appendChild(button("v", "btn-plain btn-icon", function(event) {
-								event.stopPropagation();
-								moveAnime(anime.id, 1);
-							}, "Move down"));
 							actions.appendChild(iconButton("open", "btn-plain btn-icon", function(event) {
 								event.stopPropagation();
 								send("open-anime", anime.id);
 							}, "Open anime in Seanime"));
+							actions.appendChild(button("v", "btn-plain btn-icon", function(event) {
+								event.stopPropagation();
+								moveAnime(anime.id, 1);
+							}, "Move down"));
 							actions.appendChild(iconButton("trash", "btn-danger btn-plain btn-icon", function(event) {
 								event.stopPropagation();
 								send("remove-anime", anime.id);
