@@ -1,7 +1,7 @@
 {
   "id": "Watch-Next-Kolex06-Version",
   "name": "Watch Next Kolex06-Version",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
@@ -10,7 +10,7 @@
   "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/Watch-Next-Kolex06-Version.png",
   "website": "",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/README.md",
-  "notes": "Sidebar-only build. Restores the 1.0.1 full AniList order sync behavior while spacing AniList writes and retrying once after 429 rate limits.",
+  "notes": "Sidebar-only build. Uses compact icon buttons for row Open and Remove actions while keeping full AniList order sync with 429 pacing and retry safety.",
   "lang": "en",
   "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/provider.ts",
   "plugin": {

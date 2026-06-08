@@ -910,6 +910,13 @@ function init() {
 						padding: 0;
 					}
 
+					.btn-icon .icon {
+						display: block;
+						width: 17px;
+						height: 17px;
+						pointer-events: none;
+					}
+
 					.summary {
 						display: grid;
 						grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1336,6 +1343,23 @@ function init() {
 							return node;
 						}
 
+						function icon(name) {
+							if (name === "open") {
+								return '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>';
+							}
+							if (name === "trash") {
+								return '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>';
+							}
+							return "";
+						}
+
+						function iconButton(name, className, onClick, title) {
+							var node = button("", className, onClick, title);
+							node.innerHTML = icon(name);
+							node.setAttribute("aria-label", title || name);
+							return node;
+						}
+
 						function coverNode(anime) {
 							var wrap = create("div", "cover");
 							if (anime.coverImage) {
@@ -1690,11 +1714,11 @@ function init() {
 								event.stopPropagation();
 								moveAnime(anime.id, 1);
 							}, "Move down"));
-							actions.appendChild(button("Open", "btn-plain", function(event) {
+							actions.appendChild(iconButton("open", "btn-plain btn-icon", function(event) {
 								event.stopPropagation();
 								send("open-anime", anime.id);
 							}, "Open anime in Seanime"));
-							actions.appendChild(button("Remove", "btn-danger btn-plain", function(event) {
+							actions.appendChild(iconButton("trash", "btn-danger btn-plain btn-icon", function(event) {
 								event.stopPropagation();
 								send("remove-anime", anime.id);
 							}, "Remove from queue"));
