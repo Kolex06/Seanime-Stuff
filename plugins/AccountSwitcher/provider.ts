@@ -1,0 +1,304 @@
+function init() {
+  $ui.register(function(ctx) {
+    var ACCOUNTS_KEY = "account-switcher-kolex06:accounts";
+    var ACTIVE_KEY = "account-switcher-kolex06:active";
+
+    function loadAccounts() {
+      try {
+        return $storage.get("accounts") || {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function loadActiveKey() {
+      try {
+        return $storage.get("active") || "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function injectMenuScript() {
+      ctx.dom.queryOne("body").then(async function(body) {
+        if (!body) return;
+
+        var script = await ctx.dom.createElement("script");
+        script.setText(`
+          (() => {
+            if (window.__ASKV_MENU_INSTALLED__) return;
+            window.__ASKV_MENU_INSTALLED__ = true;
+
+            const ACCOUNTS_KEY = ${JSON.stringify(ACCOUNTS_KEY)};
+            const ACTIVE_KEY = ${JSON.stringify(ACTIVE_KEY)};
+            const initialAccounts = ${JSON.stringify(loadAccounts())};
+            const initialActive = ${JSON.stringify(loadActiveKey())};
+            const MENU_SELECTOR = '[data-radix-menu-content][role="menu"]';
+            const ROOT_ATTR = 'data-account-switcher-menu';
+            const ROOT_SELECTOR = '[' + ROOT_ATTR + '="true"]';
+            const ITEM_CLASS = 'UI-DropdownMenu__item relative flex select-none items-center rounded-xl cursor-pointer px-2 py-2 text-sm outline-none transition-colors focus:bg-[--subtle] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:mr-2 [&>svg]:text-lg';
+            const INPUT_STYLE = 'width:100%;min-width:0;border:1px solid var(--border);border-radius:0.75rem;background:var(--background);color:var(--foreground);padding:0.5rem 0.75rem;font-size:0.875rem;outline:none;';
+
+            function readJson(key, fallback) {
+              try {
+                const value = window.localStorage.getItem(key);
+                return value ? JSON.parse(value) : fallback;
+              } catch (_) {
+                return fallback;
+              }
+            }
+
+            function writeJson(key, value) {
+              try {
+                window.localStorage.setItem(key, JSON.stringify(value));
+              } catch (_) {}
+            }
+
+            if (!window.localStorage.getItem(ACCOUNTS_KEY) && initialAccounts && Object.keys(initialAccounts).length) {
+              writeJson(ACCOUNTS_KEY, initialAccounts);
+            }
+            if (!window.localStorage.getItem(ACTIVE_KEY) && initialActive) {
+              window.localStorage.setItem(ACTIVE_KEY, initialActive);
+            }
+
+            function loadAccountsLocal() {
+              return readJson(ACCOUNTS_KEY, {});
+            }
+
+            function saveAccountsLocal(accounts) {
+              writeJson(ACCOUNTS_KEY, accounts || {});
+            }
+
+            function loadActiveLocal() {
+              try {
+                return window.localStorage.getItem(ACTIVE_KEY) || '';
+              } catch (_) {
+                return '';
+              }
+            }
+
+            function saveActiveLocal(key) {
+              try {
+                window.localStorage.setItem(ACTIVE_KEY, key || '');
+              } catch (_) {}
+            }
+
+            function normalizeKey(username) {
+              const key = String(username || '')
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9_.-]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+              return key || ('account-' + Date.now());
+            }
+
+            function escapeHtml(value) {
+              return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+              })[char] || char);
+            }
+
+            function icon(name) {
+              const icons = {
+                check: '<svg stroke="currentColor" fill="none" stroke-width="2.2" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+                plus: '<svg stroke="currentColor" fill="none" stroke-width="2.2" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+                trash: '<svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18M8 6V4h8v2M6 6l1 18h10l1-18" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+                arrow: '<svg stroke="currentColor" fill="none" stroke-width="2.1" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M8 7h11M8 12h11M8 17h11M4 7h.01M4 12h.01M4 17h.01" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+                x: '<svg stroke="currentColor" fill="none" stroke-width="2.2" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+                user: '<svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" stroke-linecap="round" stroke-linejoin="round"></path></svg>'
+              };
+              return '<span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;margin-right:0.5rem;font-size:1rem;line-height:1;color:currentColor;">' + (icons[name] || icons.user) + '</span>';
+            }
+
+            function item(label, iconName, action, muted) {
+              return '<div role="menuitem" tabindex="-1" data-orientation="vertical" data-radix-collection-item=""' +
+                (action ? ' data-as-action="' + escapeHtml(action) + '"' : '') +
+                ' class="' + ITEM_CLASS + (muted ? ' opacity-70' : '') + '">' +
+                icon(iconName) +
+                '<span>' + escapeHtml(label) + '</span>' +
+                '</div>';
+            }
+
+            function separator() {
+              return '<div role="separator" style="height:1px;margin:0.35rem 0.25rem;background:var(--border);opacity:0.75;"></div>';
+            }
+
+            function listHtml() {
+              const accounts = loadAccountsLocal();
+              const active = loadActiveLocal();
+              const keys = Object.keys(accounts);
+              let html = '';
+              if (!keys.length) {
+                html += item('No AniList accounts saved', 'user', '', true);
+              } else {
+                keys.forEach((key) => {
+                  const account = accounts[key] || {};
+                  const current = key === active;
+                  html += item((current ? 'Current: ' : 'Switch to ') + account.username, current ? 'check' : 'user', 'switch:' + key, false);
+                });
+              }
+              html += separator();
+              html += item('Add AniList account', 'plus', 'add', false);
+              if (keys.length) html += item('Delete saved account', 'trash', 'delete', false);
+              return html;
+            }
+
+            function addHtml() {
+              return '<div style="display:flex;flex-direction:column;gap:0.5rem;padding:0.5rem;">' +
+                '<div style="font-size:0.75rem;color:var(--muted-foreground);padding:0 0.25rem;">AniList Account</div>' +
+                '<input data-as-field="username" type="text" placeholder="AniList username" autocomplete="off" style="' + INPUT_STYLE + '">' +
+                '<input data-as-field="token" type="password" placeholder="AniList access token" autocomplete="off" style="' + INPUT_STYLE + '">' +
+                item('Save account', 'check', 'save', false) +
+                item('Cancel', 'x', 'cancel', true) +
+                '</div>';
+            }
+
+            function deleteHtml() {
+              const accounts = loadAccountsLocal();
+              const keys = Object.keys(accounts);
+              let html = '';
+              if (!keys.length) {
+                html += item('No accounts to delete', 'trash', '', true);
+              } else {
+                keys.forEach((key) => {
+                  const account = accounts[key] || {};
+                  html += item('Delete ' + account.username, 'trash', 'remove:' + key, false);
+                });
+              }
+              html += separator();
+              html += item('Back', 'arrow', 'back', true);
+              return html;
+            }
+
+            function render(root, mode) {
+              root.dataset.asMode = mode || 'list';
+              root.innerHTML = mode === 'add' ? addHtml() : mode === 'delete' ? deleteHtml() : listHtml();
+            }
+
+            async function switchAccount(key) {
+              const account = loadAccountsLocal()[key];
+              if (!account || !account.token) return;
+
+              try {
+                await fetch('http://127.0.0.1:43211/api/v1/auth/logout', {
+                  method: 'POST',
+                  headers: { Accept: 'application/json' }
+                });
+              } catch (_) {}
+
+              const res = await fetch('http://127.0.0.1:43211/api/v1/auth/login', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json'
+                },
+                body: JSON.stringify({ token: account.token })
+              });
+
+              if (res.ok) {
+                saveActiveLocal(key);
+                window.location.reload();
+              }
+            }
+
+            function stop(event) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+
+            function bind(root) {
+              if (root.dataset.asBound === 'true') return;
+              root.dataset.asBound = 'true';
+
+              root.addEventListener('click', (event) => {
+                const target = event.target && event.target.closest ? event.target.closest('[data-as-action]') : null;
+                if (!target || !root.contains(target)) return;
+                stop(event);
+
+                const action = target.getAttribute('data-as-action') || '';
+                if (action === 'add') return render(root, 'add');
+                if (action === 'delete') return render(root, 'delete');
+                if (action === 'cancel' || action === 'back') return render(root, 'list');
+                if (action.indexOf('switch:') === 0) return switchAccount(action.slice(7));
+                if (action.indexOf('remove:') === 0) {
+                  const key = action.slice(7);
+                  const accounts = loadAccountsLocal();
+                  delete accounts[key];
+                  saveAccountsLocal(accounts);
+                  if (loadActiveLocal() === key) saveActiveLocal('');
+                  return render(root, 'list');
+                }
+                if (action === 'save') {
+                  const username = String((root.querySelector('[data-as-field="username"]') || {}).value || '').trim();
+                  const token = String((root.querySelector('[data-as-field="token"]') || {}).value || '').trim();
+                  if (!username || !token) return;
+                  const accounts = loadAccountsLocal();
+                  const key = normalizeKey(username);
+                  accounts[key] = { username, token };
+                  saveAccountsLocal(accounts);
+                  if (!loadActiveLocal()) saveActiveLocal(key);
+                  return render(root, 'list');
+                }
+              }, true);
+
+              root.addEventListener('keydown', (event) => {
+                if (event.target && event.target.matches && event.target.matches('input')) {
+                  event.stopPropagation();
+                }
+              }, true);
+            }
+
+            function isProfileMenu(menu) {
+              return !!menu && menu.matches && menu.matches(MENU_SELECTOR) && /sign out/i.test(menu.textContent || '');
+            }
+
+            function enhance(menu) {
+              if (!isProfileMenu(menu)) return;
+              if (menu.querySelector(ROOT_SELECTOR)) return;
+
+              const signOut = Array.from(menu.querySelectorAll('[role="menuitem"]')).find((node) => /sign out/i.test(node.textContent || ''));
+              const root = document.createElement('div');
+              root.setAttribute(ROOT_ATTR, 'true');
+              root.style.display = 'block';
+              render(root, 'list');
+              bind(root);
+
+              if (signOut && signOut.parentElement) signOut.parentElement.insertBefore(root, signOut);
+              else menu.appendChild(root);
+            }
+
+            function scan(root) {
+              const scope = root && root.querySelectorAll ? root : document;
+              if (isProfileMenu(scope)) enhance(scope);
+              scope.querySelectorAll(MENU_SELECTOR).forEach(enhance);
+            }
+
+            const observer = new MutationObserver((mutations) => {
+              for (const mutation of mutations) {
+                mutation.addedNodes.forEach((node) => {
+                  if (node && node.nodeType === 1) scan(node);
+                });
+              }
+            });
+
+            scan(document);
+            observer.observe(document.body, { childList: true, subtree: true });
+          })();
+        `);
+
+        body.append(script);
+      });
+    }
+
+    ctx.dom.onReady(injectMenuScript);
+    try {
+      if (ctx.dom.onMainTabReady && typeof ctx.dom.onMainTabReady === "function") {
+        ctx.dom.onMainTabReady(injectMenuScript);
+      }
+    } catch (e) {}
+  });
+}

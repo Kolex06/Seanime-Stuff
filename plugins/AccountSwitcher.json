@@ -1,0 +1,37 @@
+{
+  "id": "Account-Switcher-Kolex06-Version",
+  "name": "Account Switcher Kolex06-Version",
+  "version": "1.0.9",
+  "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher.json",
+  "language": "typescript",
+  "type": "plugin",
+  "description": "Allows you to switch between multiple AniList accounts from the Seanime avatar menu.",
+  "author": "Kolex06",
+  "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/account-switcher.svg",
+  "website": "",
+  "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher/README.md",
+  "lang": "multi",
+  "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher/provider.ts",
+  "plugin": {
+    "version": "1",
+    "permissions": {
+      "scopes": [
+        "storage"
+      ],
+      "allow": {
+        "networkAccess": {
+          "allowedDomains": [
+            "127.0.0.1"
+          ],
+          "reasoning": "Fallback for older Seanime builds that need the local auth API to switch AniList tokens."
+        },
+        "unsafeFlags": [
+          {
+            "flag": "dom-script-manipulation",
+            "reason": "Required to place the Account Switcher controls inside Seanime's existing avatar dropdown menu."
+          }
+        ]
+      }
+    }
+  }
+}

@@ -28,6 +28,20 @@
     "lang": "en"
   },
   {
+    "id": "Account-Switcher-Kolex06-Version",
+    "name": "Account Switcher Kolex06-Version",
+    "version": "1.0.9",
+    "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher.json",
+    "language": "typescript",
+    "type": "plugin",
+    "description": "Switch between saved AniList accounts from Seanime's avatar dropdown menu.",
+    "author": "Kolex06",
+    "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/account-switcher.svg",
+    "website": "",
+    "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher/README.md",
+    "lang": "multi"
+  },
+  {
     "id": "asunatracks-sync",
     "name": "AsunaTracks Sync",
     "version": "0.1.22",

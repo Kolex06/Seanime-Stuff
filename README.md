@@ -20,6 +20,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 | --- | --- | --- | --- |
 | SeaUtils Kolex06-Version | 1.2.71 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
 | AniList Notifications Kolex06-Version | 1.0.15 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
+| Account Switcher Kolex06-Version | 1.0.9 | `Account-Switcher-Kolex06-Version` | AniList account switcher moved from the tray into Seanime's avatar dropdown menu. |
 | AsunaTracks Sync | 0.1.22 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
@@ -108,6 +109,29 @@ Icon:
 https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/AniList-Notifications-Kolex06-Version.png
 ```
 
+## Account Switcher Kolex06-Version
+
+Account Switcher Kolex06-Version lets you save multiple AniList access tokens and switch between them directly from the Seanime avatar dropdown menu.
+
+Features include:
+
+- Avatar-menu controls above `Sign out`.
+- Add saved AniList accounts by username and access token.
+- Switch to a saved account without using a tray button.
+- Delete saved accounts from the same menu.
+
+Direct manifest:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher.json
+```
+
+Documentation:
+
+```text
+https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/AccountSwitcher/README.md
+```
+
 ## AsunaTracks Sync
 
 AsunaTracks Sync connects Seanime/AniList progress with AsunaTracks.
@@ -154,6 +178,10 @@ plugins/
   AniListNotificationsKolex06Version/
     README.md
     provider.ts
+  AccountSwitcher/
+    README.md
+    provider.ts
+  AccountSwitcher.json
   SeaUtils-Kolex06-Version.json
   SeaUtilsKolex06Version/
     README.md
@@ -164,6 +192,7 @@ plugins/
     provider.ts
 icons/
   AniList-Notifications-Kolex06-Version.png
+  account-switcher.svg
   SeaUtils-Kolex06-Version.png
   asunatracks.png
 ```
