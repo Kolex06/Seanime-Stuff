@@ -114,6 +114,13 @@ https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/icons/An
 
 Account Switcher Kolex06-Version lets you save multiple AniList access tokens and switch between them directly from the Seanime avatar dropdown menu.
 
+Version info:
+
+- Current version: `1.0.9`
+- Manifest file: `plugins/Account-Switcher-Kolex06-Version.json`
+- Source folder: `plugins/AccountSwitcherKolex06Version/`
+- Icon: `icons/account-switcher.png`
+
 Features include:
 
 - Avatar-menu controls above `Sign out`.
