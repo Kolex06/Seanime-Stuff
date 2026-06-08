@@ -4,10 +4,19 @@ Account Switcher Kolex06-Version lets you save multiple AniList access tokens an
 
 ## Version History
 
+### 1.0.10
+- Only injects into the real avatar/profile dropdown.
+- Stops Account Switcher controls from appearing inside tray extension menus or other non-profile dropdowns.
+
 ### 1.0.9
 - Moves the account switcher from the tray into the avatar dropdown above `Sign out`.
+- Uses the PNG icon at `icons/account-switcher.png`.
+- Uses the public manifest file `plugins/Account-Switcher-Kolex06-Version.json`.
+- Uses the public source folder `plugins/AccountSwitcherKolex06Version/`.
+- Keeps the extension ID as `Account-Switcher-Kolex06-Version`.
 
 ### 1.0.8 and earlier
+- Original Account Switcher base.
 - Saved AniList accounts and switched between them from the extension UI.
 
 ## What changed

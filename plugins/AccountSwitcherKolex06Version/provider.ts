@@ -34,6 +34,7 @@ function init() {
             const initialAccounts = ${JSON.stringify(loadAccounts())};
             const initialActive = ${JSON.stringify(loadActiveKey())};
             const MENU_SELECTOR = '[data-radix-menu-content][role="menu"]';
+            const PROFILE_TRIGGER_SELECTOR = '.UI-Avatar__root, .UI-Avatar__image, img[src*="anilistcdn/user/avatar"]';
             const ROOT_ATTR = 'data-account-switcher-menu';
             const ROOT_SELECTOR = '[' + ROOT_ATTR + '="true"]';
             const ITEM_CLASS = 'UI-DropdownMenu__item relative flex select-none items-center rounded-xl cursor-pointer px-2 py-2 text-sm outline-none transition-colors focus:bg-[--subtle] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:mr-2 [&>svg]:text-lg';
@@ -252,15 +253,34 @@ function init() {
               }, true);
             }
 
+            function exactText(node, text) {
+              return String((node && node.textContent) || '').trim().toLowerCase() === text;
+            }
+
+            function getMenuTrigger(menu) {
+              const triggerId = menu && menu.getAttribute ? menu.getAttribute('aria-labelledby') : '';
+              return triggerId ? document.getElementById(triggerId) : null;
+            }
+
+            function isAvatarTrigger(trigger) {
+              return !!trigger && !!(
+                (trigger.matches && trigger.matches(PROFILE_TRIGGER_SELECTOR)) ||
+                (trigger.querySelector && trigger.querySelector(PROFILE_TRIGGER_SELECTOR))
+              );
+            }
+
             function isProfileMenu(menu) {
-              return !!menu && menu.matches && menu.matches(MENU_SELECTOR) && /sign out/i.test(menu.textContent || '');
+              if (!menu || !menu.matches || !menu.matches(MENU_SELECTOR)) return false;
+              const items = Array.from(menu.querySelectorAll('[role="menuitem"]'));
+              if (!items.some((node) => exactText(node, 'sign out'))) return false;
+              return isAvatarTrigger(getMenuTrigger(menu));
             }
 
             function enhance(menu) {
               if (!isProfileMenu(menu)) return;
               if (menu.querySelector(ROOT_SELECTOR)) return;
 
-              const signOut = Array.from(menu.querySelectorAll('[role="menuitem"]')).find((node) => /sign out/i.test(node.textContent || ''));
+              const signOut = Array.from(menu.querySelectorAll('[role="menuitem"]')).find((node) => exactText(node, 'sign out'));
               const root = document.createElement('div');
               root.setAttribute(ROOT_ATTR, 'true');
               root.style.display = 'block';

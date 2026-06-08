@@ -1,7 +1,7 @@
 {
   "id": "Account-Switcher-Kolex06-Version",
   "name": "Account Switcher Kolex06-Version",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Account-Switcher-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
