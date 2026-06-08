@@ -945,7 +945,7 @@ function init() {
 
 					.queue-row {
 						display: grid;
-						grid-template-columns: 34px 74px minmax(0, 1fr) auto;
+						grid-template-columns: 30px 34px 74px minmax(0, 1fr) auto;
 						gap: 12px;
 						align-items: center;
 						min-height: 106px;
@@ -965,6 +965,28 @@ function init() {
 					.queue-row.drag-over {
 						border-color: var(--gold);
 						background: rgba(37, 51, 78, 0.9);
+					}
+
+					.drag-handle {
+						display: grid;
+						width: 30px;
+						height: 46px;
+						place-items: center;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						background: rgba(15, 23, 42, 0.72);
+						color: var(--muted);
+						cursor: grab;
+						font-weight: 950;
+						letter-spacing: 0;
+						touch-action: none;
+						user-select: none;
+					}
+
+					.drag-handle:active {
+						cursor: grabbing;
+						border-color: var(--border-strong);
+						color: var(--text);
 					}
 
 					.rank {
@@ -1198,7 +1220,7 @@ function init() {
 						}
 
 						.queue-row {
-							grid-template-columns: 32px 62px minmax(0, 1fr);
+							grid-template-columns: 30px 32px 62px minmax(0, 1fr);
 						}
 
 						.cover {
@@ -1241,6 +1263,7 @@ function init() {
 
 						var draggingId = null;
 						var dragOverId = null;
+						var pointerDrag = null;
 						var root = document.getElementById("app");
 
 						function send(name, value) {
@@ -1319,7 +1342,7 @@ function init() {
 							render();
 						}
 
-						function dropAnime(fromId, toId) {
+						function dropAnime(fromId, toId, insertAfter) {
 							fromId = Number(fromId);
 							toId = Number(toId);
 							if (!fromId || !toId || fromId === toId) return;
@@ -1332,8 +1355,81 @@ function init() {
 							ids.splice(fromIndex, 1);
 							var insertIndex = ids.indexOf(toId);
 							if (insertIndex < 0) insertIndex = ids.length;
+							if (insertAfter) insertIndex += 1;
 							ids.splice(insertIndex, 0, fromId);
 							reorderByIds(ids);
+						}
+
+						function dropTargetFromPoint(clientX, clientY) {
+							var target = document.elementFromPoint(clientX, clientY);
+							var row = target && typeof target.closest === "function" ? target.closest(".queue-row") : null;
+							if (!row || !row.dataset) return null;
+
+							var id = Number(row.dataset.id);
+							if (!id) return null;
+
+							var rect = row.getBoundingClientRect();
+							return {
+								id: id,
+								after: clientY > rect.top + rect.height / 2
+							};
+						}
+
+						function cleanupPointerDrag() {
+							document.removeEventListener("pointermove", handlePointerDragMove, true);
+							document.removeEventListener("pointerup", handlePointerDragEnd, true);
+							document.removeEventListener("pointercancel", handlePointerDragCancel, true);
+							pointerDrag = null;
+							draggingId = null;
+							dragOverId = null;
+						}
+
+						function startPointerDrag(event, anime) {
+							if (event.button !== undefined && event.button !== 0) return;
+							event.preventDefault();
+							event.stopPropagation();
+							pointerDrag = {
+								id: Number(anime.id),
+								target: null
+							};
+							draggingId = Number(anime.id);
+							dragOverId = Number(anime.id);
+							document.addEventListener("pointermove", handlePointerDragMove, true);
+							document.addEventListener("pointerup", handlePointerDragEnd, true);
+							document.addEventListener("pointercancel", handlePointerDragCancel, true);
+							render();
+						}
+
+						function handlePointerDragMove(event) {
+							if (!pointerDrag) return;
+							event.preventDefault();
+							var target = dropTargetFromPoint(event.clientX, event.clientY);
+							pointerDrag.target = target;
+							var nextOverId = target ? target.id : null;
+							if (dragOverId !== nextOverId) {
+								dragOverId = nextOverId;
+								render();
+							}
+						}
+
+						function handlePointerDragEnd(event) {
+							if (!pointerDrag) return;
+							event.preventDefault();
+							event.stopPropagation();
+							var fromId = pointerDrag.id;
+							var target = pointerDrag.target || dropTargetFromPoint(event.clientX, event.clientY);
+							cleanupPointerDrag();
+							if (target && target.id) {
+								dropAnime(fromId, target.id, !!target.after);
+							} else {
+								render();
+							}
+						}
+
+						function handlePointerDragCancel() {
+							if (!pointerDrag) return;
+							cleanupPointerDrag();
+							render();
 						}
 
 						function moveAnime(id, direction) {
@@ -1479,14 +1575,16 @@ function init() {
 
 							row.addEventListener("dragstart", function(event) {
 								draggingId = anime.id;
-								event.dataTransfer.effectAllowed = "move";
-								event.dataTransfer.setData("text/plain", String(anime.id));
+								if (event.dataTransfer) {
+									event.dataTransfer.effectAllowed = "move";
+									event.dataTransfer.setData("text/plain", String(anime.id));
+								}
 								window.setTimeout(render, 0);
 							});
 
 							row.addEventListener("dragover", function(event) {
 								event.preventDefault();
-								event.dataTransfer.dropEffect = "move";
+								if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
 								if (dragOverId !== anime.id) {
 									dragOverId = anime.id;
 									render();
@@ -1502,10 +1600,11 @@ function init() {
 
 							row.addEventListener("drop", function(event) {
 								event.preventDefault();
-								var fromId = draggingId || event.dataTransfer.getData("text/plain");
+								var target = dropTargetFromPoint(event.clientX, event.clientY);
+								var fromId = draggingId || (event.dataTransfer ? event.dataTransfer.getData("text/plain") : null);
 								draggingId = null;
 								dragOverId = null;
-								dropAnime(fromId, anime.id);
+								dropAnime(fromId, anime.id, !!(target && target.after));
 							});
 
 							row.addEventListener("dragend", function() {
@@ -1514,6 +1613,15 @@ function init() {
 								render();
 							});
 
+							var handle = create("div", "drag-handle", "||");
+							handle.title = "Drag to reorder";
+							handle.setAttribute("role", "button");
+							handle.setAttribute("aria-label", "Drag " + (anime.title || "anime") + " to reorder");
+							handle.tabIndex = 0;
+							handle.addEventListener("pointerdown", function(event) {
+								startPointerDrag(event, anime);
+							});
+							row.appendChild(handle);
 							row.appendChild(create("div", "rank", String(index + 1)));
 							row.appendChild(coverNode(anime));
 
@@ -1523,9 +1631,9 @@ function init() {
 							var season = seasonText(anime);
 							if (season) meta.appendChild(create("span", "badge", season));
 							if (anime.status) meta.appendChild(create("span", "badge", titleCase(anime.status)));
-							meta.appendChild(create("span", "badge", "Drag to reorder"));
+							meta.appendChild(create("span", "badge", "Drag handle"));
 							main.appendChild(meta);
-							main.appendChild(create("div", "drag-hint", "Grab this row and drop it above another anime."));
+							main.appendChild(create("div", "drag-hint", "Grab the handle and drop above or below another anime."));
 							row.appendChild(main);
 
 							var actions = create("div", "row-actions");

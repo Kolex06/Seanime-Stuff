@@ -7,7 +7,7 @@ Kolex06-styled Seanime plugin for building a personal Watch Next anime queue.
 - Sidebar page.
 - Add anime from your AniList lists.
 - Search, list, year, season, and added-time filters.
-- Drag rows up or down to reorder the queue.
+- Drag rows by the handle to reorder the queue.
 - Up/down buttons remain available as a fallback.
 - Auto-sync queued anime into an AniList custom list named Watch Next in queue order.
 - Uses AniList priority updates so already-listed anime are reordered too.
