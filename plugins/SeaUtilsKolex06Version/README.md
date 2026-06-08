@@ -1,23 +1,29 @@
 # SeaUtils Kolex06-Version
 
-SeaUtils Kolex06-Version is a Seanime utility extension focused on improving the extension marketplace and common browsing pages.
+SeaUtils Kolex06-Version is a Seanime utility extension by Kolex06. It improves the Extensions marketplace, adds better catalog popups, gives media grids optional carousel behavior, and adds small quality-of-life badges for anime cards.
+
+Version `1.2.71` keeps the working marketplace and carousel behavior from `1.2.70`, then adds optional Bas1874 marketplace metadata support for status and scan information.
 
 ## Features
 
 - Better Marketplace layout with searchable rows and a Full Catalog popup.
-- Full Catalog action buttons for More, Preferences, Code, and Documentation when available.
+- Combined Full Catalog for Plugins, Anime torrents, Manga, Online streaming, and other marketplace sections.
+- Per-section View All popups that group entries like Full Catalog.
+- Full Catalog/View All action buttons for More, Preferences, Code, Documentation, and install/update actions when available.
 - Update highlighting for extensions with a newer version available.
 - Per-page carousel settings for Search, My Lists, Manga, and Other Pages.
 - Separate Extensions page carousel setting that depends on Better Marketplace.
 - Drag-to-scroll carousel support while keeping normal click behavior.
 - Sub/Dub badges on anime cards.
 - Tray preferences for toggling SeaUtils features.
+- Optional Bas1874 marketplace support with status and scan metadata badges.
 
 ## Preferences
 
 SeaUtils adds preferences in the tray and in supported extension action popups:
 
 - Better Marketplace
+- Bas1874 Marketplace metadata
 - Carousels
 - Carousels: Search
 - Carousels: Extensions
@@ -28,14 +34,41 @@ SeaUtils adds preferences in the tray and in supported extension action popups:
 
 ## Full Catalog
 
-The Full Catalog popup keeps extension actions close to each card:
+The Full Catalog popup keeps marketplace entries organized and keeps extension actions close to each card:
 
 - Preferences is placed beside More.
 - Documentation is placed beside Code and only appears when the extension has docs.
 - Code opens the installed extension payload when available.
 - More opens extension details and management actions.
+- Broken and Deprecated groups are pinned near the bottom when Bas1874 metadata is enabled.
+- View All popups use the same author grouping style as Full Catalog.
+
+## Bas1874 Marketplace Metadata
+
+When the Bas1874 marketplace option is enabled, SeaUtils can show extra metadata on marketplace cards:
+
+- Working
+- Broken
+- Deprecated
+- Official
+- VirusTotal
+- Scanned version
+- Last working version
+- Flag count
+
+Broken and Deprecated entries are also collected into their own marketplace groups. This keeps normal sections cleaner while still making problem entries easy to find, search, and open.
+
+Virus scan metadata is informational only. You should still review extensions yourself before installing them.
 
 ## Version History
+
+### 1.2.71
+- Adds the optional Bas1874 Marketplace metadata setting.
+- Lets marketplace cards show status badges such as Working, Broken, Deprecated, and Official when using Bas1874 Marketplace.
+- Adds scan-related metadata badges for VirusTotal, scanned version, last working version, and flag Count when using Bas1874 Marketplace.
+- Moves Broken and Deprecated marketplace entries into dedicated groups instead of leaving duplicate cards in normal groups.
+- Keeps Broken/Deprecated groups pinned near the bottom and searchable when using Bas1874 Marketplace.
+- Keeps Full Catalog/View All grouping based on real authors, not programming language labels.
 
 ### 1.2.70
 - Made per-section View All popups group rows like Full Catalog.

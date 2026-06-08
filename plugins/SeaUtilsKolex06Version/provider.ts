@@ -13,6 +13,7 @@ interface AmaSettings {
     carouselsOther: boolean
     subDubIcons: boolean
     hideFileNames: boolean
+    useBas1874Marketplace: boolean
 }
 
 function init() {
@@ -30,6 +31,7 @@ function init() {
             carouselsOther: true,
             subDubIcons: true,
             hideFileNames: false,
+            useBas1874Marketplace: false,
         }
 
         function getStorageApi(): any | null {
@@ -58,6 +60,7 @@ function init() {
                 carouselsOther: saved.carouselsOther !== false,
                 subDubIcons: saved.subDubIcons !== false,
                 hideFileNames: saved.hideFileNames === true,
+                useBas1874Marketplace: saved.useBas1874Marketplace === true,
             }
         }
 
@@ -94,6 +97,7 @@ function init() {
         const carouselsOtherRef = ctx.fieldRef<boolean>(settingsState.get().carouselsOther)
         const subDubIconsRef = ctx.fieldRef<boolean>(settingsState.get().subDubIcons)
         const hideFileNamesRef = ctx.fieldRef<boolean>(settingsState.get().hideFileNames)
+        const useBas1874MarketplaceRef = ctx.fieldRef<boolean>(settingsState.get().useBas1874Marketplace)
 
         const trayIconUrl = "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/SeaUtils-Kolex06-Version.png"
 
@@ -178,6 +182,10 @@ function init() {
             updateSetting("hideFileNames", !!value)
         })
 
+        useBas1874MarketplaceRef.onValueChange((value) => {
+            updateSetting("useBas1874Marketplace", !!value)
+        })
+
         tray.render(() => {
             const settings = settingsState.get()
             const disabledValueText = (label: string, value: boolean, reason: string) => {
@@ -236,6 +244,9 @@ function init() {
                 }),
                 tray.switch("Hide File Names", {
                     fieldRef: hideFileNamesRef,
+                }),
+                tray.switch("Bas1874 Marketplace", {
+                    fieldRef: useBas1874MarketplaceRef,
                 }),
             ])
         })
@@ -624,6 +635,74 @@ function init() {
                 background: rgba(255, 255, 255, 0.08) !important;
             }
 
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra,
+            body[data-ama-better-marketplace="true"] .ama-installed-marketplace-extra {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                align-items: center !important;
+                gap: 6px !important;
+                margin-top: 10px !important;
+                padding-top: 10px !important;
+                border-top: 1px solid rgba(255,255,255,0.08) !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-badge {
+                display: inline-flex !important;
+                align-items: center !important;
+                min-height: 20px !important;
+                padding: 3px 7px !important;
+                border-radius: 999px !important;
+                border: 1px solid rgba(255,255,255,0.12) !important;
+                background: rgba(255,255,255,0.06) !important;
+                color: rgba(255,255,255,0.78) !important;
+                font-size: 11px !important;
+                font-weight: 700 !important;
+                line-height: 1 !important;
+                white-space: nowrap !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-badge.working {
+                color: #86efac !important;
+                border-color: rgba(74,222,128,0.45) !important;
+                background: rgba(34,197,94,0.12) !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-badge.broken {
+                color: #fca5a5 !important;
+                border-color: rgba(248,113,113,0.5) !important;
+                background: rgba(239,68,68,0.14) !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-badge.deprecated {
+                color: #fde68a !important;
+                border-color: rgba(250,204,21,0.45) !important;
+                background: rgba(234,179,8,0.12) !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-badge.scan {
+                color: #bae6fd !important;
+                border-color: rgba(56,189,248,0.45) !important;
+                background: rgba(14,165,233,0.12) !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-badge.official {
+                color: #c4b5fd !important;
+                border-color: rgba(167,139,250,0.45) !important;
+                background: rgba(124,58,237,0.12) !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-badge.link {
+                text-decoration: none !important;
+                cursor: pointer !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-marketplace-extra-note {
+                width: 100% !important;
+                color: rgba(255,255,255,0.48) !important;
+                font-size: 11px !important;
+                line-height: 1.35 !important;
+            }
+
             body[data-ama-better-marketplace="true"] .group\\/extension-card[data-ama-update-available="true"],
             body[data-ama-better-marketplace="true"] .ama-catalog-card-wrap[data-ama-update-available="true"] > .group\\/extension-card,
             body[data-ama-better-marketplace="true"] .UI-Card__root[data-ama-update-available="true"] {
@@ -669,6 +748,14 @@ function init() {
             body[data-ama-better-marketplace="true"] .ama-extension-carousel img {
                 -webkit-user-drag: none !important;
                 user-drag: none !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-status-section {
+                margin-top: 10px !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-status-source-hidden {
+                display: none !important;
             }
 
             body[data-ama-better-marketplace="true"] .ama-header-container {
@@ -1209,7 +1296,10 @@ function init() {
                         carouselsOther: true,
                         subDubIcons: true,
                         hideFileNames: false,
+                        useBas1874Marketplace: false,
                     };
+
+                    const BAS1874_MARKETPLACE_URL = 'https://raw.githubusercontent.com/Bas1874/Seanime-Marketplace/refs/heads/main/Marketplace/Main.json';
 
                     function readBrowserSettings() {
                         try {
@@ -1262,11 +1352,17 @@ function init() {
 
                     let dubIdSetPromise = null;
                     const dragScrollEnhancementVersion = 'v8';
-                    const marketplaceEnhancementVersion = 'v10';
+                    const marketplaceEnhancementVersion = 'v11';
                     const catalogActionSources = new Map();
                     let allExtensionsPromise = null;
+                    let marketplaceExtensionsPromise = null;
+                    let bas1874MarketplaceMetadataPromise = null;
+                    let bas1874MarketplaceMetadataCache = [];
+                    let marketplaceStatusSectionsScheduled = false;
+                    let marketplaceStatusSectionsRendering = false;
                     let catalogActionSourceCounter = 0;
                     let catalogActionHandlerBound = false;
+                    let marketplaceSearchVisibilityHandlerBound = false;
 
                     function isElement(node) {
                         return node && node.nodeType === 1;
@@ -1347,6 +1443,7 @@ function init() {
                         document.body.setAttribute('data-ama-carousels-active', String(areCarouselsEnabledForCurrentPage()));
                         document.body.setAttribute('data-ama-subdub-icons', String(!!featureSettings.subDubIcons));
                         document.body.setAttribute('data-ama-hide-file-names', String(!!featureSettings.hideFileNames));
+                        document.body.setAttribute('data-ama-bas1874-marketplace', String(!!featureSettings.useBas1874Marketplace));
                     }
 
                     function escapeHtml(value) {
@@ -1927,6 +2024,13 @@ function init() {
 
                     function filterCards(container, term) {
                         const normalized = String(term || '').toLowerCase();
+                        const isModalSearch = !!(
+                            container &&
+                            (
+                                (container.classList && container.classList.contains('ama-modal')) ||
+                                (container.closest && container.closest('.ama-modal'))
+                            )
+                        );
 
                         container.querySelectorAll('.group\\\\/extension-card').forEach(card => {
                             const isVisible = card.innerText.toLowerCase().includes(normalized);
@@ -1938,6 +2042,48 @@ function init() {
                                 card.style.display = isVisible ? 'flex' : 'none';
                             }
                         });
+
+                        if (!isModalSearch && container && container.querySelectorAll) {
+                            getMarketplaceSections(false).forEach(marketplaceSection => {
+                                const section = marketplaceSection.card;
+                                const grid = section.querySelector('.ama-extension-carousel, .grid');
+                                if (!grid) return;
+
+                                if (!normalized) {
+                                    section.hidden = false;
+                                    return;
+                                }
+
+                                const hasVisible = Array.from(grid.querySelectorAll('.group\\\\/extension-card')).some(card => {
+                                    if (card.classList && card.classList.contains('ama-status-source-hidden')) return false;
+                                    const wrapper = card.closest('.ama-catalog-card-wrap');
+                                    return wrapper ? !wrapper.hidden : card.style.display !== 'none';
+                                });
+
+                                section.hidden = !hasVisible;
+                            });
+
+                            container.querySelectorAll('.ama-status-section').forEach(section => {
+                                const grid = section.querySelector('.ama-extension-carousel, .grid');
+                                if (!grid) {
+                                    section.hidden = true;
+                                    return;
+                                }
+
+                                if (!normalized) {
+                                    section.hidden = !grid.querySelector('.group\\\\/extension-card');
+                                    return;
+                                }
+
+                                const hasVisible = Array.from(grid.querySelectorAll('.ama-catalog-card-wrap, .group\\\\/extension-card')).some(item => {
+                                    return !item.hidden && item.style.display !== 'none';
+                                });
+
+                                section.hidden = !hasVisible;
+                            });
+
+                            syncMarketplaceSectionSearchVisibility();
+                        }
                     }
 
                     function cleanupBetterMarketplace(root) {
@@ -1976,6 +2122,7 @@ function init() {
 
                         if (root.querySelectorAll) {
                             root.querySelectorAll('.ama-global-catalog-bar').forEach(bar => bar.remove());
+                            root.querySelectorAll('.ama-live-card-actions').forEach(actions => actions.remove());
                             root.querySelectorAll('.ama-extension-carousel').forEach(grid => {
                                 grid.classList.remove('ama-extension-carousel');
                                 grid.dataset.amaDragScrollEnhanced = "false";
@@ -2023,19 +2170,26 @@ function init() {
                     function getExtensionCardData(card) {
                         const paragraphs = Array.from(card.querySelectorAll('p')).map(p => p.textContent.trim()).filter(Boolean);
                         const badges = Array.from(card.querySelectorAll('.UI-Badge__root')).map(badge => badge.textContent.trim()).filter(Boolean);
+                        const getBadgeValue = (label) => {
+                            const pattern = new RegExp('^' + label + '\\s*:\\s*(.+)$', 'i');
+                            const match = badges.map(value => String(value || '').match(pattern)).find(Boolean);
+
+                            return match ? match[1].trim() : '';
+                        };
                         const idEl = card.querySelector('.text-xs .opacity-30, [data-extension-id], [data-extension-card-id]');
                         const titleEl = card.querySelector('.font-semibold');
                         const manifestLinkPattern = new RegExp('plugins/[^/?#]+[.]json', 'i');
                         const manifestLink = Array.from(card.querySelectorAll('a[href]')).map(link => link.getAttribute('href') || '').find(href => manifestLinkPattern.test(href)) || '';
                         const manifestId = getExtensionIdFromManifestUri(manifestLink);
+                        const firstPlainBadge = badges.find(value => !/^(id|author|language|manifest url)\s*:/i.test(value)) || '';
 
                         return {
-                            id: (idEl && idEl.textContent.trim()) || manifestId || getKnownExtensionIdFromText(card.innerText || card.textContent || ''),
+                            id: getBadgeValue('ID') || manifestId || (idEl && idEl.textContent.trim()) || getKnownExtensionIdFromText(card.innerText || card.textContent || ''),
                             name: (titleEl && titleEl.textContent.trim()) || paragraphs[0] || 'Extension',
                             description: paragraphs[2] || paragraphs[1] || '',
-                            version: badges[0] || '',
-                            author: badges[1] || '',
-                            language: badges[2] || '',
+                            version: getBadgeValue('Version') || firstPlainBadge,
+                            author: getBadgeValue('Author') || badges[1] || '',
+                            language: getBadgeValue('Language') || badges[2] || '',
                         };
                     }
 
@@ -2212,7 +2366,12 @@ function init() {
 
                         root.querySelectorAll('.group\\\\/extension-card').forEach(card => cards.push(card));
 
-                        cards.forEach(card => markExtensionUpdateState(card));
+                        cards.forEach(card => {
+                            markExtensionUpdateState(card);
+                            enhanceMarketplaceExtraInfo(card);
+                            enhanceInstalledMarketplaceExtraInfo(card);
+                            enhanceInstalledMarketplaceCardActions(card);
+                        });
                     }
 
                     function openAmaModal(title, contentHtml) {
@@ -2542,12 +2701,14 @@ function init() {
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Carousels: Other Pages</label><button type="button" class="ama-config-toggle" data-ama-pref="carouselsOther"></button></div>' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Sub/Dub Icons</label><input data-ama-pref="subDubIcons" type="checkbox"></div>' +
                                 '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Hide File Names</label><input data-ama-pref="hideFileNames" type="checkbox"></div>' +
+                                '<div class="ama-config-switch-row"><label class="ama-config-switch-label">Bas1874 Marketplace</label><input data-ama-pref="useBas1874Marketplace" type="checkbox"></div>' +
+                                '<div class="ama-config-help">Uses the extended marketplace feed with status and VirusTotal scan metadata. Refresh the Extensions page after switching.</div>' +
                                 '<div class="ama-config-actions"><button type="button" class="ama-config-save">Save</button><span class="ama-config-status"></span></div>' +
                             '</div>';
 
                         bindAmaModalClose(modal);
 
-                        ['betterMarketplace', 'carousels', 'carouselsSearch', 'carouselsExtensions', 'carouselsLists', 'carouselsManga', 'carouselsOther', 'subDubIcons', 'hideFileNames'].forEach(key => {
+                        ['betterMarketplace', 'carousels', 'carouselsSearch', 'carouselsExtensions', 'carouselsLists', 'carouselsManga', 'carouselsOther', 'subDubIcons', 'hideFileNames', 'useBas1874Marketplace'].forEach(key => {
                             const control = modal.querySelector('[data-ama-pref="' + key + '"]');
                             if (!control) return;
 
@@ -2702,6 +2863,7 @@ function init() {
                                     carouselsOther: readPreferenceChecked('carouselsOther'),
                                     subDubIcons: readPreferenceChecked('subDubIcons'),
                                     hideFileNames: readPreferenceChecked('hideFileNames'),
+                                    useBas1874Marketplace: readPreferenceChecked('useBas1874Marketplace'),
                                 };
 
                                 if (typeof window.__AMA_SAVE_SETTINGS__ === 'function') {
@@ -2709,6 +2871,7 @@ function init() {
                                 } else {
                                     featureSettings = normalizeFeatureSettings(next);
                                     writeBrowserSettings(featureSettings);
+                                    applyBas1874MarketplacePreference();
                                     setBodyFlags();
                                 }
 
@@ -3208,19 +3371,365 @@ function init() {
                         }
                     }
 
-                    async function fetchMarketplaceExtensionById(extensionId) {
+                    function writeMarketplaceUrl(value) {
+                        try {
+                            if (value) {
+                                window.localStorage.setItem('marketplace-url', JSON.stringify(value));
+                            } else {
+                                window.localStorage.removeItem('marketplace-url');
+                            }
+                        } catch (_) {}
+                    }
+
+                    function applyBas1874MarketplacePreference() {
+                        const current = readMarketplaceUrl();
+
+                        if (featureSettings.useBas1874Marketplace) {
+                            if (current !== BAS1874_MARKETPLACE_URL) {
+                                writeMarketplaceUrl(BAS1874_MARKETPLACE_URL);
+                                marketplaceExtensionsPromise = null;
+                                bas1874MarketplaceMetadataPromise = null;
+                            }
+                            return;
+                        }
+
+                        if (current === BAS1874_MARKETPLACE_URL) {
+                            writeMarketplaceUrl('');
+                            marketplaceExtensionsPromise = null;
+                            bas1874MarketplaceMetadataPromise = null;
+                        }
+                    }
+
+                    function getMarketplaceEndpoint() {
                         const marketplaceUrl = readMarketplaceUrl();
-                        const endpoint = marketplaceUrl
+
+                        return marketplaceUrl
                             ? '/api/v1/extensions/marketplace?marketplace=' + encodeURIComponent(marketplaceUrl)
                             : '/api/v1/extensions/marketplace';
+                    }
 
-                        const extensions = await fetchSeanime(endpoint, {
+                    function loadMarketplaceExtensions() {
+                        if (marketplaceExtensionsPromise) return marketplaceExtensionsPromise;
+
+                        marketplaceExtensionsPromise = fetchSeanime(getMarketplaceEndpoint(), {
                             method: 'GET'
+                        }).then(extensions => {
+                            return Array.isArray(extensions) ? extensions : [];
+                        }).catch(() => {
+                            marketplaceExtensionsPromise = null;
+                            return [];
                         });
 
-                        if (!Array.isArray(extensions)) return null;
+                        return marketplaceExtensionsPromise;
+                    }
+
+                    async function fetchMarketplaceExtensionById(extensionId) {
+                        const extensions = await loadMarketplaceExtensions();
 
                         return extensions.find(extension => extension && extension.id === extensionId) || null;
+                    }
+
+                    function normalizeMarketplaceLookupText(value) {
+                        return String(value || '')
+                            .trim()
+                            .replace(/^(id|author|language|version|manifest url)\s*:\s*/i, '')
+                            .trim()
+                            .toLowerCase();
+                    }
+
+                    function normalizeMarketplaceSlug(value) {
+                        return normalizeMarketplaceLookupText(value)
+                            .replace(/&/g, ' and ')
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-+|-+$/g, '');
+                    }
+
+                    function slugContainsSlug(containerSlug, itemSlug) {
+                        if (!containerSlug || !itemSlug || itemSlug.length < 3) return false;
+
+                        return ('-' + containerSlug + '-').includes('-' + itemSlug + '-');
+                    }
+
+                    function loadBas1874MarketplaceMetadata() {
+                        if (bas1874MarketplaceMetadataPromise) return bas1874MarketplaceMetadataPromise;
+
+                        bas1874MarketplaceMetadataPromise = fetch(BAS1874_MARKETPLACE_URL, {
+                            cache: 'no-store'
+                        }).then(response => {
+                            if (!response.ok) throw new Error('Could not load Bas1874 marketplace metadata.');
+                            return response.json();
+                        }).then(data => {
+                            if (Array.isArray(data)) {
+                                bas1874MarketplaceMetadataCache = data;
+                                return data;
+                            }
+
+                            if (data && Array.isArray(data.extensions)) {
+                                bas1874MarketplaceMetadataCache = data.extensions;
+                                return data.extensions;
+                            }
+
+                            if (data && Array.isArray(data.items)) {
+                                bas1874MarketplaceMetadataCache = data.items;
+                                return data.items;
+                            }
+
+                            bas1874MarketplaceMetadataCache = [];
+                            return [];
+                        }).catch(() => {
+                            bas1874MarketplaceMetadataPromise = null;
+                            bas1874MarketplaceMetadataCache = [];
+                            return [];
+                        });
+
+                        return bas1874MarketplaceMetadataPromise;
+                    }
+
+                    function isInstalledExtensionsView() {
+                        return !!document.querySelector('input[placeholder="Search installed extensions..."]');
+                    }
+
+                    function isMarketplaceExtraCard(card) {
+                        if (!card || !card.isConnected) return false;
+                        if (card.closest && card.closest('.ama-modal')) return true;
+                        if (isInstalledExtensionsView()) return false;
+
+                        return true;
+                    }
+
+                    async function fetchBas1874MetadataForMarketplaceCard(card) {
+                        const data = getExtensionCardData(card);
+                        const cardId = normalizeMarketplaceLookupText(data.id);
+
+                        if (!cardId) return null;
+
+                        const extensions = await loadBas1874MarketplaceMetadata();
+
+                        return extensions.find(extension => normalizeMarketplaceLookupText(extension && extension.id) === cardId) || null;
+                    }
+
+                    function getBas1874MetadataForCardData(data) {
+                        if (!featureSettings.useBas1874Marketplace || !Array.isArray(bas1874MarketplaceMetadataCache)) return null;
+
+                        const cardId = normalizeMarketplaceLookupText(data && data.id);
+                        const cardName = normalizeMarketplaceLookupText(data && data.name);
+                        const cardAuthor = normalizeMarketplaceLookupText(data && data.author);
+                        const cardIdSlug = normalizeMarketplaceSlug(data && data.id);
+                        const cardNameSlug = normalizeMarketplaceSlug(data && data.name);
+
+                        if (cardId) {
+                            const byId = bas1874MarketplaceMetadataCache.find(extension => {
+                                const extensionId = normalizeMarketplaceLookupText(extension && extension.id);
+                                const extensionIdSlug = normalizeMarketplaceSlug(extension && extension.id);
+                                const extensionNameSlug = normalizeMarketplaceSlug(extension && extension.name);
+
+                                return extensionId === cardId || extensionIdSlug === cardIdSlug || extensionNameSlug === cardIdSlug;
+                            });
+
+                            if (byId) return byId;
+                        }
+
+                        if (cardName) {
+                            return bas1874MarketplaceMetadataCache.find(extension => {
+                                const nameMatches = normalizeMarketplaceLookupText(extension && extension.name) === cardName;
+                                const slugMatches = normalizeMarketplaceSlug(extension && extension.name) === cardNameSlug || normalizeMarketplaceSlug(extension && extension.id) === cardNameSlug;
+                                const authorMatches = !cardAuthor || normalizeMarketplaceLookupText(extension && extension.author) === cardAuthor;
+
+                                return (nameMatches && authorMatches) || slugMatches;
+                            }) || null;
+                        }
+
+                        return null;
+                    }
+
+                    function getBas1874StatusGroupForCard(item, data) {
+                        if (item && item.querySelector) {
+                            if (item.querySelector('.ama-marketplace-extra-badge.broken')) return 'Broken Extensions';
+                            if (item.querySelector('.ama-marketplace-extra-badge.deprecated')) return 'Deprecated Extensions';
+                        }
+
+                        const extension = getBas1874MetadataForCardData(data);
+                        if (!extension) return '';
+
+                        if (extension.brokenTag) return 'Broken Extensions';
+                        if (extension.deprecatedTag) return 'Deprecated Extensions';
+
+                        return '';
+                    }
+
+                    function createMarketplaceExtraBadge(text, className, href) {
+                        const el = href ? document.createElement('a') : document.createElement('span');
+                        el.className = 'ama-marketplace-extra-badge' + (className ? ' ' + className : '');
+                        el.textContent = text;
+
+                        if (href) {
+                            el.href = href;
+                            el.target = '_blank';
+                            el.rel = 'noreferrer';
+                            el.classList.add('link');
+                        }
+
+                        return el;
+                    }
+
+                    function appendBas1874ExtraBadges(extra, extension, includeNote) {
+                        if (!extra || !extension) return false;
+
+                        if (extension.official) extra.appendChild(createMarketplaceExtraBadge('Official', 'official'));
+                        if (extension.workingTag) extra.appendChild(createMarketplaceExtraBadge('Working', 'working'));
+                        if (extension.brokenTag) extra.appendChild(createMarketplaceExtraBadge('Broken', 'broken'));
+                        if (extension.deprecatedTag) extra.appendChild(createMarketplaceExtraBadge('Deprecated', 'deprecated'));
+
+                        if (extension.flags) {
+                            extra.appendChild(createMarketplaceExtraBadge('VT ' + String(extension.flags), 'scan', extension.permalink || ''));
+                        } else if (extension.permalink) {
+                            extra.appendChild(createMarketplaceExtraBadge('VirusTotal', 'scan', extension.permalink));
+                        }
+
+                        if (extension.scannedOnVersion) {
+                            extra.appendChild(createMarketplaceExtraBadge('Scanned ' + String(extension.scannedOnVersion), 'scan'));
+                        }
+
+                        if (extension.lastWorkingVersion) {
+                            extra.appendChild(createMarketplaceExtraBadge('Last working ' + String(extension.lastWorkingVersion), 'working'));
+                        }
+
+                        if (!extra.children.length) return false;
+
+                        extra.appendChild(createMarketplaceExtraBadge('Bas1874 metadata', 'scan'));
+
+                        if (includeNote) {
+                            const note = document.createElement('div');
+                            note.className = 'ama-marketplace-extra-note';
+                            note.textContent = 'Status and scan data are hints. Review plugins yourself before installing.';
+                            extra.appendChild(note);
+                        }
+
+                        return true;
+                    }
+
+                    function renderMarketplaceExtraInfo(card, extension) {
+                        if (!card || !extension || !isMarketplaceExtraCard(card)) return;
+
+                        card.querySelectorAll('.ama-marketplace-extra').forEach(el => el.remove());
+
+                        if (!featureSettings.useBas1874Marketplace) return;
+
+                        const extra = document.createElement('div');
+                        extra.className = 'ama-marketplace-extra';
+
+                        if (!appendBas1874ExtraBadges(extra, extension, true)) return;
+
+                        card.appendChild(extra);
+                    }
+
+                    function getInstalledBadgeRow(card) {
+                        if (!card || !card.querySelectorAll) return null;
+
+                        const rows = Array.from(card.querySelectorAll('.flex')).filter(row => {
+                            return row && row.querySelectorAll && row.querySelectorAll('.UI-Badge__root').length > 0;
+                        });
+
+                        if (!rows.length) return null;
+
+                        const idRow = rows.find(row => /(^|\s)ID\s*:/i.test(row.textContent || ''));
+                        return idRow || rows[rows.length - 1];
+                    }
+
+                    async function fetchBas1874MetadataForInstalledCard(card) {
+                        const data = getExtensionCardData(card);
+
+                        await loadBas1874MarketplaceMetadata();
+
+                        const directMatch = getBas1874MetadataForCardData(data);
+                        if (directMatch) return directMatch;
+
+                        const cardSlug = normalizeMarketplaceSlug(card.innerText || card.textContent || '');
+                        if (!cardSlug) return null;
+
+                        return bas1874MarketplaceMetadataCache.find(extension => {
+                            const idSlug = normalizeMarketplaceSlug(extension && extension.id);
+                            const nameSlug = normalizeMarketplaceSlug(extension && extension.name);
+
+                            return slugContainsSlug(cardSlug, idSlug) || slugContainsSlug(cardSlug, nameSlug);
+                        }) || null;
+                    }
+
+                    function renderInstalledMarketplaceExtraInfo(card, extension) {
+                        if (!card || !extension || !isInstalledExtensionsView()) return;
+
+                        card.querySelectorAll('.ama-installed-marketplace-extra').forEach(el => el.remove());
+
+                        if (!featureSettings.useBas1874Marketplace) return;
+
+                        const extra = document.createElement('div');
+                        extra.className = 'ama-installed-marketplace-extra';
+
+                        if (!appendBas1874ExtraBadges(extra, extension, false)) return;
+
+                        const badgeRow = getInstalledBadgeRow(card);
+
+                        if (badgeRow && badgeRow.parentElement) {
+                            badgeRow.parentElement.insertBefore(extra, badgeRow.nextSibling);
+                        } else {
+                            card.appendChild(extra);
+                        }
+                    }
+
+                    function enhanceInstalledMarketplaceExtraInfo(card) {
+                        if (!card || !isInstalledExtensionsView()) return;
+
+                        if (!featureSettings.useBas1874Marketplace) {
+                            card.querySelectorAll('.ama-installed-marketplace-extra').forEach(el => el.remove());
+                            delete card.dataset.amaInstalledMarketplaceExtraEnhanced;
+                            return;
+                        }
+
+                        if (card.dataset.amaInstalledMarketplaceExtraEnhanced === marketplaceEnhancementVersion) return;
+                        card.dataset.amaInstalledMarketplaceExtraEnhanced = marketplaceEnhancementVersion;
+
+                        fetchBas1874MetadataForInstalledCard(card).then(extension => {
+                            if (!card.isConnected || !extension) return;
+                            renderInstalledMarketplaceExtraInfo(card, extension);
+                            hideStatusSourceCard(card, extension);
+                            scheduleMarketplaceStatusSections();
+                        }).catch(() => {});
+                    }
+
+                    function hideStatusSourceCard(card, extension) {
+                        if (!card || !extension || card.closest('.ama-status-section') || card.closest('.ama-modal')) return;
+
+                        let group = '';
+
+                        if (extension.brokenTag) {
+                            group = 'Broken Extensions';
+                        } else if (extension.deprecatedTag) {
+                            group = 'Deprecated Extensions';
+                        }
+
+                        if (!group) return;
+
+                        card.classList.add('ama-status-source-hidden');
+                        card.dataset.amaStatusGroup = group;
+                    }
+
+                    function enhanceMarketplaceExtraInfo(card) {
+                        if (!card || !featureSettings.useBas1874Marketplace || !isMarketplaceExtraCard(card)) {
+                            if (card && card.querySelectorAll) {
+                                card.querySelectorAll('.ama-marketplace-extra').forEach(el => el.remove());
+                            }
+                            return;
+                        }
+
+                        if (card.dataset.amaMarketplaceExtraEnhanced === marketplaceEnhancementVersion) return;
+                        card.dataset.amaMarketplaceExtraEnhanced = marketplaceEnhancementVersion;
+
+                        fetchBas1874MetadataForMarketplaceCard(card).then(extension => {
+                            if (!card.isConnected || !extension) return;
+                            renderMarketplaceExtraInfo(card, extension);
+                            hideStatusSourceCard(card, extension);
+                            scheduleMarketplaceStatusSections();
+                        }).catch(() => {});
                     }
 
                     async function installMarketplaceExtension(card) {
@@ -3281,8 +3790,42 @@ function init() {
                         return sourceCard.dataset.amaCatalogSourceId;
                     }
 
-                    function runCatalogAction(action, sourceId) {
-                        const sourceCard = catalogActionSources.get(sourceId);
+                    function getFallbackActionCard(button) {
+                        const wrapper = button && button.closest ? button.closest('.ama-catalog-card-wrap') : null;
+                        if (!wrapper || !wrapper.querySelector) return null;
+
+                        return wrapper.querySelector('.group\\\\/extension-card');
+                    }
+
+                    function getFallbackActionId(button) {
+                        const wrapper = button && button.closest ? button.closest('.ama-catalog-card-wrap') : null;
+                        return (wrapper && wrapper.dataset && wrapper.dataset.amaActionExtensionId) || '';
+                    }
+
+                    function findCurrentInstalledCardById(extensionId) {
+                        const id = normalizeMarketplaceLookupText(extensionId);
+                        if (!id) return null;
+
+                        const cards = Array.from(document.querySelectorAll('.group\\\\/extension-card'));
+                        return cards.find(card => {
+                            if (card.closest && card.closest('.ama-modal')) return false;
+                            if (card.closest && card.closest('.ama-status-section')) return false;
+                            const data = getExtensionCardData(card);
+                            return normalizeMarketplaceLookupText(data.id) === id;
+                        }) || null;
+                    }
+
+                    function runCatalogAction(action, sourceId, fallbackCard, extensionId) {
+                        const storedSourceCard = catalogActionSources.get(sourceId);
+                        let sourceCard = (
+                            storedSourceCard && storedSourceCard.isConnected
+                                ? storedSourceCard
+                                : (findCurrentInstalledCardById(extensionId) || fallbackCard)
+                        );
+
+                        if (isInstalledExtensionsView() && action !== 'download') {
+                            sourceCard = findCurrentInstalledCardById(extensionId) || sourceCard;
+                        }
 
                         if (!sourceCard || !sourceCard.isConnected) {
                             openAmaModal('Action unavailable', '<p>This card is no longer available. Close Full Catalog, open it again, and try once more.</p>');
@@ -3331,16 +3874,17 @@ function init() {
                             const button = target && target.closest ? target.closest('.ama-clone-action') : null;
 
                             if (!button) return;
+                            if (button.dataset.amaDirectAction === 'true') return;
 
                             event.preventDefault();
                             event.stopPropagation();
                             if (event.stopImmediatePropagation) event.stopImmediatePropagation();
 
-                            runCatalogAction(button.dataset.amaAction, button.dataset.amaSourceId);
+                            runCatalogAction(button.dataset.amaAction, button.dataset.amaSourceId, getFallbackActionCard(button), button.dataset.amaExtensionId || getFallbackActionId(button));
                         }, true);
                     }
 
-                    function addCloneAction(actions, title, icon, action, sourceId, prepend) {
+                    function addCloneAction(actions, title, icon, action, sourceId, extensionId) {
                         if (actions.querySelector('[data-ama-action="' + action + '"]')) return;
 
                         const button = document.createElement('button');
@@ -3350,6 +3894,7 @@ function init() {
                         button.setAttribute('aria-label', title);
                         button.dataset.amaAction = action;
                         button.dataset.amaSourceId = sourceId;
+                        if (extensionId) button.dataset.amaExtensionId = extensionId;
                         button.innerHTML = icon;
                         button.onpointerdown = event => {
                             event.stopPropagation();
@@ -3367,57 +3912,129 @@ function init() {
                             event.preventDefault();
                             event.stopPropagation();
                             if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-                            runCatalogAction(action, sourceId);
+                            if (button.dataset.amaDirectAction === 'true') return;
+                            runCatalogAction(action, sourceId, getFallbackActionCard(button), button.dataset.amaExtensionId || getFallbackActionId(button));
                         }, true);
 
                         actions.appendChild(button);
                     }
 
-                    function createMarketplaceCloneActions(sourceCard, isInstalledCatalog) {
+                    function bindDirectStatusActions(actions) {
+                        if (!actions || !actions.querySelectorAll) return;
+
+                        function runDirectStatusAction(button, event) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+
+                            const action = button.dataset.amaAction;
+                            const extensionId = button.dataset.amaExtensionId || getFallbackActionId(button);
+                            const card = (
+                                isInstalledExtensionsView() && action !== 'download'
+                                    ? findCurrentInstalledCardById(extensionId)
+                                    : null
+                            ) || getFallbackActionCard(button);
+                            if (!card) return;
+
+                            if (action === 'details' || action === 'more') {
+                                showInstalledMore(card);
+                                return;
+                            }
+
+                            if (action === 'code') {
+                                showInstalledCode(card);
+                                return;
+                            }
+
+                            if (action === 'documentation') {
+                                showInstalledDocumentation(card);
+                                return;
+                            }
+
+                            if (action === 'preferences') {
+                                const data = getExtensionCardData(card);
+
+                                if (isKolex06VersionExtension(data)) {
+                                    showKolex06VersionPreferences();
+                                } else {
+                                    showInstalledPreferences(card);
+                                }
+                            }
+                        }
+
+                        actions.querySelectorAll('.ama-clone-action').forEach(button => {
+                            button.dataset.amaDirectAction = 'true';
+                            button.onpointerdown = event => runDirectStatusAction(button, event);
+                            button.addEventListener('click', event => {
+                                runDirectStatusAction(button, event);
+                            }, true);
+                        });
+                    }
+
+                    function createMarketplaceCloneActions(sourceCard, isInstalledCatalog, forceMarketplaceActions) {
                         const actions = document.createElement('div');
                         actions.className = 'ama-clone-actions';
 
                         const liveButtons = Array.from(sourceCard.querySelectorAll('button'));
-                        const isInstalled = !!sourceCard.querySelector('button[disabled]');
+                        const isInstalled = sourceCard.dataset.amaInstalledMarketplaceCard === 'true' || !!sourceCard.querySelector('button[disabled]');
                         const data = getExtensionCardData(sourceCard);
                         const sourceId = getCatalogActionSourceId(sourceCard);
+                        const extensionId = data.id || '';
 
                         ensureCatalogActionHandler();
 
                         if (isInstalledCatalog || isInstalled) {
                             if (isKolex06VersionExtension(data) || sourceCardHasNativePreferences(sourceCard)) {
-                                addCloneAction(actions, 'Preferences', SETTINGS_ICON, 'preferences', sourceId);
+                                addCloneAction(actions, 'Preferences', SETTINGS_ICON, 'preferences', sourceId, extensionId);
                             } else {
                                 hasPreferencesForCard(sourceCard).then(hasPreferences => {
                                     if (!hasPreferences) return;
 
-                                    addCloneAction(actions, 'Preferences', SETTINGS_ICON, 'preferences', sourceId);
+                                    addCloneAction(actions, 'Preferences', SETTINGS_ICON, 'preferences', sourceId, extensionId);
                                 });
                             }
 
-                            addCloneAction(actions, 'More', MORE_ICON, 'more', sourceId);
+                            addCloneAction(actions, 'More', MORE_ICON, 'more', sourceId, extensionId);
 
                             if (getKnownDocumentationUrl(data)) {
-                                addCloneAction(actions, 'Documentation', DOC_ICON, 'documentation', sourceId);
+                                addCloneAction(actions, 'Documentation', DOC_ICON, 'documentation', sourceId, extensionId);
                             } else {
                                 hasDocumentationForCard(sourceCard).then(hasDocumentation => {
                                     if (!hasDocumentation) return;
 
-                                    addCloneAction(actions, 'Documentation', DOC_ICON, 'documentation', sourceId);
+                                    addCloneAction(actions, 'Documentation', DOC_ICON, 'documentation', sourceId, extensionId);
                                 });
                             }
 
-                            addCloneAction(actions, 'Code', CODE_ICON, 'code', sourceId);
-                        } else if (!isInstalled && liveButtons.length) {
-                            addCloneAction(actions, 'Download', DOWNLOAD_ICON, 'download', sourceId);
+                            addCloneAction(actions, 'Code', CODE_ICON, 'code', sourceId, extensionId);
+                        } else if (!isInstalled && (liveButtons.length || forceMarketplaceActions)) {
+                            addCloneAction(actions, 'Download', DOWNLOAD_ICON, 'download', sourceId, extensionId);
                         }
 
                         return actions.children.length ? actions : null;
                     }
 
-                    function getMarketplaceSections() {
+                    function enhanceInstalledMarketplaceCardActions(card) {
+                        if (!card || !featureSettings.betterMarketplace) return;
+                        if (isInstalledExtensionsView()) return;
+                        if (card.closest && (card.closest('.ama-modal') || card.closest('.ama-catalog-card-wrap') || card.closest('.ama-status-section'))) return;
+                        if (!isMarketplaceExtraCard(card)) return;
+                        if (!card.querySelector('button[disabled]')) return;
+
+                        const existing = card.querySelector(':scope > .ama-live-card-actions');
+                        if (existing) return;
+
+                        const actions = createMarketplaceCloneActions(card, true);
+                        if (!actions) return;
+
+                        actions.classList.add('ama-live-card-actions');
+                        card.appendChild(actions);
+                    }
+
+                    function getMarketplaceSections(includeStatusSections) {
                         return Array.from(document.querySelectorAll(cardQuery)).map(card => {
                             if (!isMarketplaceSectionCard(card)) return null;
+                            if (!includeStatusSections && card.dataset && card.dataset.amaStatusSection) return null;
 
                             const titleEl = card.querySelector('.ama-header-left h3, h3');
                             const grid = card.querySelector('.ama-extension-carousel, .grid');
@@ -3436,13 +4053,17 @@ function init() {
                         }).filter(Boolean);
                     }
 
-                    function groupMarketplaceSectionsByAuthor(sections) {
+                    function groupMarketplaceSectionsByAuthor(sections, useStatusGroups) {
                         const grouped = new Map();
+                        const hasStatusSections = (sections || []).some(section => section && section.card && section.card.dataset && section.card.dataset.amaStatusSection);
+                        const shouldUseStatusGroups = useStatusGroups !== false;
 
                         (sections || []).forEach(section => {
                             section.items.forEach(item => {
+                                if (hasStatusSections && item.classList && item.classList.contains('ama-status-source-hidden')) return;
+
                                 const data = getExtensionCardData(item);
-                                const author = data.author || 'Unknown';
+                                const author = (shouldUseStatusGroups ? getBas1874StatusGroupForCard(item, data) : '') || data.author || 'Unknown';
 
                                 if (!grouped.has(author)) {
                                     grouped.set(author, {
@@ -3457,11 +4078,317 @@ function init() {
                             });
                         });
 
-                        return Array.from(grouped.values()).sort((a, b) => a.title.localeCompare(b.title));
+                        const priority = (title) => {
+                            if (title === 'Broken Extensions') return 2;
+                            if (title === 'Deprecated Extensions') return 3;
+                            return 0;
+                        };
+
+                        return Array.from(grouped.values()).sort((a, b) => {
+                            const leftPriority = priority(a.title);
+                            const rightPriority = priority(b.title);
+
+                            if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+
+                            return a.title.localeCompare(b.title);
+                        });
+                    }
+
+                    function syncMarketplaceStatusSectionSearchVisibility() {
+                        const hasSearchTerm = Array.from(document.querySelectorAll('input')).some(input => {
+                            if (!input || input.closest('.ama-modal')) return false;
+                            if (!/search/i.test(String(input.placeholder || ''))) return false;
+
+                            return String(input.value || '').trim().length > 0;
+                        });
+
+                        document.querySelectorAll('.ama-status-section').forEach(section => {
+                            const grid = section.querySelector('.ama-extension-carousel, .grid');
+                            if (!grid) {
+                                section.hidden = true;
+                                return;
+                            }
+
+                            if (!hasSearchTerm) {
+                                section.hidden = !grid.querySelector('.group\\\\/extension-card');
+                                return;
+                            }
+
+                            const hasVisible = Array.from(grid.querySelectorAll('.ama-catalog-card-wrap, .group\\\\/extension-card')).some(item => {
+                                return !item.hidden && item.style.display !== 'none';
+                            });
+
+                            section.hidden = !hasVisible;
+                        });
+                    }
+
+                    function isVisibleMarketplaceCard(card) {
+                        if (!card || (card.classList && card.classList.contains('ama-status-source-hidden'))) return false;
+
+                        const wrapper = card.closest && card.closest('.ama-catalog-card-wrap');
+                        if (wrapper && wrapper.hidden) return false;
+
+                        if (card.hidden || card.style.display === 'none') return false;
+
+                        try {
+                            const style = window.getComputedStyle(card);
+                            if (style && style.display === 'none') return false;
+                        } catch (_) {}
+
+                        return true;
+                    }
+
+                    function syncMarketplaceSectionSearchVisibility() {
+                        const hasSearchTerm = Array.from(document.querySelectorAll('input')).some(input => {
+                            if (!input || input.closest('.ama-modal')) return false;
+                            if (!/search/i.test(String(input.placeholder || ''))) return false;
+
+                            return String(input.value || '').trim().length > 0;
+                        });
+
+                        getMarketplaceSections(false).forEach(section => {
+                            if (!section || !section.card || (section.card.dataset && section.card.dataset.amaStatusSection)) return;
+
+                            if (!hasSearchTerm) {
+                                section.card.hidden = false;
+                                return;
+                            }
+
+                            const hasVisible = section.items.some(isVisibleMarketplaceCard);
+                            section.card.hidden = !hasVisible;
+                        });
+                    }
+
+                    function ensureMarketplaceSearchVisibilityHandler() {
+                        if (marketplaceSearchVisibilityHandlerBound) return;
+
+                        marketplaceSearchVisibilityHandlerBound = true;
+
+                        document.addEventListener('input', event => {
+                            const input = event.target;
+                            if (!input || !input.matches || !input.matches('input')) return;
+                            if (input.closest('.ama-modal')) return;
+                            if (!/search/i.test(String(input.placeholder || ''))) return;
+
+                            setTimeout(syncMarketplaceStatusSectionSearchVisibility, 0);
+                            setTimeout(syncMarketplaceSectionSearchVisibility, 80);
+                            setTimeout(syncMarketplaceSectionSearchVisibility, 220);
+                        }, true);
                     }
 
                     function getAuthorFullCatalogSections() {
-                        return groupMarketplaceSectionsByAuthor(getMarketplaceSections());
+                        return groupMarketplaceSectionsByAuthor(getMarketplaceSections(true));
+                    }
+
+                    function bindMarketplaceStatusViewAll(section, title) {
+                        if (!section || !section.querySelector) return;
+
+                        const viewBtn = section.querySelector('.ama-view-btn');
+                        if (!viewBtn) return;
+
+                        const openStatusCatalog = event => {
+                            if (event) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+                            }
+
+                            const grid = section.querySelector('.ama-extension-carousel, .grid');
+                            const statusSection = {
+                                title,
+                                card: section,
+                                grid,
+                                items: grid ? Array.from(grid.querySelectorAll('.group\\\\/extension-card')) : [],
+                            };
+
+                            openFullCatalogModal(groupMarketplaceSectionsByAuthor([statusSection], false), 'Full Catalog');
+                        };
+
+                        viewBtn.onclick = openStatusCatalog;
+                        viewBtn.onpointerdown = openStatusCatalog;
+                    }
+
+                    function getOrCreateMarketplaceStatusSection(title) {
+                        let section = document.querySelector('[data-ama-status-section="' + title + '"]');
+                        if (section) {
+                            bindMarketplaceStatusViewAll(section, title);
+                            return section;
+                        }
+
+                        const sections = getMarketplaceSections(false);
+                        const lastCard = sections.length ? sections[sections.length - 1].card : null;
+                        const parent = lastCard && lastCard.parentElement;
+                        if (!parent) return null;
+
+                        const card = document.createElement('div');
+                        card.className = 'UI-Card__root ama-status-section';
+                        card.dataset.amaStatusSection = title;
+
+                        const header = document.createElement('div');
+                        header.className = 'ama-header-container';
+
+                        const left = document.createElement('div');
+                        left.className = 'ama-header-left';
+
+                        const heading = document.createElement('h3');
+                        heading.textContent = title;
+
+                        left.appendChild(heading);
+
+                        const viewBtn = document.createElement('button');
+                        viewBtn.type = 'button';
+                        viewBtn.className = 'ama-view-btn';
+                        viewBtn.innerText = 'View All';
+
+                        left.appendChild(viewBtn);
+                        header.appendChild(left);
+
+                        const grid = document.createElement('div');
+                        grid.className = 'grid ama-extension-carousel';
+
+                        card.appendChild(header);
+                        card.appendChild(grid);
+                        parent.appendChild(card);
+                        makeDraggableScroller(grid, 'betterMarketplace');
+                        bindMarketplaceStatusViewAll(card, title);
+
+                        return card;
+                    }
+
+                    function regroupMarketplaceStatusSections() {
+                        if (marketplaceStatusSectionsRendering) return;
+                        if (!featureSettings.useBas1874Marketplace || !bas1874MarketplaceMetadataCache.length) return;
+
+                        marketplaceStatusSectionsRendering = true;
+
+                        const brokenSection = getOrCreateMarketplaceStatusSection('Broken Extensions');
+                        const deprecatedSection = getOrCreateMarketplaceStatusSection('Deprecated Extensions');
+                        const brokenGrid = brokenSection && brokenSection.querySelector('.ama-extension-carousel, .grid');
+                        const deprecatedGrid = deprecatedSection && deprecatedSection.querySelector('.ama-extension-carousel, .grid');
+
+                        if (!brokenGrid || !deprecatedGrid) {
+                            marketplaceStatusSectionsRendering = false;
+                            return;
+                        }
+
+                        brokenGrid.innerHTML = '';
+                        deprecatedGrid.innerHTML = '';
+
+                        document.querySelectorAll('.ama-status-source-hidden').forEach(item => {
+                            item.classList.remove('ama-status-source-hidden');
+                            delete item.dataset.amaStatusGroup;
+                        });
+
+                        getMarketplaceSections(false).forEach(section => {
+                            if (section.card === brokenSection || section.card === deprecatedSection) return;
+
+                            Array.from(section.grid.querySelectorAll('.group\\\\/extension-card')).forEach(item => {
+                                const data = getExtensionCardData(item);
+                                const group = getBas1874StatusGroupForCard(item, data);
+                                let targetGrid = null;
+
+                                if (group === 'Broken Extensions') {
+                                    targetGrid = brokenGrid;
+                                } else if (group === 'Deprecated Extensions') {
+                                    targetGrid = deprecatedGrid;
+                                }
+
+                                if (targetGrid) {
+                                    item.classList.add('ama-status-source-hidden');
+                                    item.dataset.amaStatusGroup = group;
+
+                                    const clone = item.cloneNode(true);
+                                    const wrapper = document.createElement('div');
+                                    wrapper.className = 'ama-catalog-card-wrap';
+                                    wrapper.dataset.amaActionExtensionId = data.id || '';
+                                    clone.classList.remove('ama-status-source-hidden');
+                                    delete clone.dataset.amaStatusGroup;
+                                    if (item.querySelector('button[disabled]')) {
+                                        clone.dataset.amaInstalledMarketplaceCard = 'true';
+                                    } else {
+                                        delete clone.dataset.amaInstalledMarketplaceCard;
+                                    }
+                                    clone.querySelectorAll('button').forEach(button => button.remove());
+                                    markExtensionUpdateState(clone);
+                                    const extension = getBas1874MetadataForCardData(data);
+                                    renderMarketplaceExtraInfo(clone, extension);
+                                    optimizeImages(clone);
+
+                                    wrapper.appendChild(clone);
+
+                                    const actionSource = isInstalledExtensionsView() ? clone : item;
+                                    const actions = createMarketplaceCloneActions(actionSource, isInstalledExtensionsView(), true);
+                                    if (actions) {
+                                        bindDirectStatusActions(actions);
+                                        wrapper.appendChild(actions);
+                                    }
+
+                                    targetGrid.appendChild(wrapper);
+                                }
+                            });
+                        });
+
+                        [brokenSection, deprecatedSection].forEach(section => {
+                            const grid = section.querySelector('.ama-extension-carousel, .grid');
+                            if (!grid || !grid.querySelector('.group\\\\/extension-card')) {
+                                section.hidden = true;
+                                return;
+                            }
+
+                            section.hidden = false;
+                            makeDraggableScroller(grid, 'betterMarketplace');
+                        });
+
+                        const sections = getMarketplaceSections(false);
+                        const lastCard = sections.length ? sections[sections.length - 1].card : null;
+                        const parent = lastCard && lastCard.parentElement;
+
+                        if (parent) {
+                            parent.appendChild(brokenSection);
+                            parent.appendChild(deprecatedSection);
+                        }
+
+                        syncMarketplaceStatusSectionSearchVisibility();
+                        marketplaceStatusSectionsRendering = false;
+                    }
+
+                    function cleanupMarketplaceStatusSources(root) {
+                        const scope = root || document;
+                        if (!scope || !scope.querySelectorAll) return;
+
+                        scope.querySelectorAll('.ama-status-source-hidden').forEach(item => {
+                            item.classList.remove('ama-status-source-hidden');
+                            delete item.dataset.amaStatusGroup;
+                        });
+                    }
+
+                    function cleanupMarketplaceStatusSections(root) {
+                        const scope = root || document;
+                        if (!scope || !scope.querySelectorAll) return;
+
+                        scope.querySelectorAll('.ama-status-section').forEach(section => section.remove());
+                    }
+
+                    function scheduleMarketplaceStatusSections() {
+                        if (marketplaceStatusSectionsScheduled) return;
+
+                        marketplaceStatusSectionsScheduled = true;
+
+                        setTimeout(() => {
+                            marketplaceStatusSectionsScheduled = false;
+                            regroupMarketplaceStatusSections();
+                        }, 30);
+                    }
+
+                    function openAuthorFullCatalog(title) {
+                        const open = () => openFullCatalogModal(getAuthorFullCatalogSections(), title || 'Full Catalog');
+
+                        if (featureSettings.useBas1874Marketplace) {
+                            loadBas1874MarketplaceMetadata().then(open).catch(open);
+                            return;
+                        }
+
+                        open();
                     }
 
                     function appendCatalogCards(rowGrid, items, isInstalledCatalog) {
@@ -3469,13 +4396,17 @@ function init() {
                             const clone = item.cloneNode(true);
                             const wrapper = document.createElement('div');
                             wrapper.className = 'ama-catalog-card-wrap';
+                            const isStatusItem = !!(item.closest && item.closest('.ama-status-section'));
+                            const data = getExtensionCardData(item);
+                            wrapper.dataset.amaActionExtensionId = data.id || '';
                             clone.querySelectorAll('button').forEach(button => button.remove());
                             markExtensionUpdateState(clone);
+                            enhanceMarketplaceExtraInfo(clone);
                             optimizeImages(clone);
 
                             wrapper.appendChild(clone);
 
-                            const actions = createMarketplaceCloneActions(item, isInstalledCatalog);
+                            const actions = createMarketplaceCloneActions(item, isInstalledCatalog, isStatusItem);
                             if (actions) {
                                 wrapper.appendChild(actions);
                             }
@@ -3559,14 +4490,14 @@ function init() {
                     function ensureGlobalFullCatalogButton() {
                         if (!featureSettings.betterMarketplace) return;
                         const existing = document.querySelector('.ama-global-catalog-bar');
-                        const sections = getMarketplaceSections();
+                        const sections = getMarketplaceSections(false);
                         if (existing) {
                             if (!sections.length) {
                                 existing.remove();
                                 return;
                             }
 
-                            existing.querySelector('.ama-global-catalog-btn').onclick = () => openFullCatalogModal(getAuthorFullCatalogSections(), 'Full Catalog');
+                            existing.querySelector('.ama-global-catalog-btn').onclick = () => openAuthorFullCatalog('Full Catalog');
                             return;
                         }
                         if (!sections.length) return;
@@ -3581,7 +4512,7 @@ function init() {
                         button.type = 'button';
                         button.className = 'ama-global-catalog-btn';
                         button.textContent = 'Full Catalog';
-                        button.onclick = () => openFullCatalogModal(getAuthorFullCatalogSections(), 'Full Catalog');
+                        button.onclick = () => openAuthorFullCatalog('Full Catalog');
 
                         bar.appendChild(button);
                         firstCard.parentElement.insertBefore(bar, firstCard);
@@ -3590,6 +4521,7 @@ function init() {
                     function enhanceExtensionCard(card) {
                         if (!featureSettings.betterMarketplace) return;
                         if (!card) return;
+                        if (card.dataset && card.dataset.amaStatusSection) return;
 
                         if (!isMarketplaceSectionCard(card)) {
                             if (card.dataset.amaEnhanced || card.querySelector(':scope > .ama-header-container')) {
@@ -3688,7 +4620,14 @@ function init() {
                                 items: Array.from(grid.querySelectorAll('.group\\\\/extension-card')),
                             };
 
-                            openFullCatalogModal(groupMarketplaceSectionsByAuthor([section]), 'Full Catalog');
+                            const open = () => openFullCatalogModal(groupMarketplaceSectionsByAuthor([section]), 'Full Catalog');
+
+                            if (featureSettings.useBas1874Marketplace) {
+                                loadBas1874MarketplaceMetadata().then(open).catch(open);
+                                return;
+                            }
+
+                            open();
                         };
 
                     }
@@ -3712,6 +4651,11 @@ function init() {
 
                         if (!featureSettings.subDubIcons) {
                             cleanupAllMediaBadges(root);
+                        }
+
+                        if (!featureSettings.useBas1874Marketplace) {
+                            cleanupMarketplaceStatusSources(root);
+                            cleanupMarketplaceStatusSections(root);
                         }
 
                         if (root === document) {
@@ -3738,6 +4682,8 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(document);
+                                scheduleMarketplaceStatusSections();
+                                ensureMarketplaceSearchVisibilityHandler();
                                 ensureGlobalFullCatalogButton();
                             } else {
                                 cleanupBetterMarketplace(document);
@@ -3784,6 +4730,8 @@ function init() {
                                     enhanceExtensionCard(card);
                                 });
                                 markMarketplaceExtensionCards(root);
+                                scheduleMarketplaceStatusSections();
+                                ensureMarketplaceSearchVisibilityHandler();
                                 ensureGlobalFullCatalogButton();
                             } else {
                                 cleanupBetterMarketplace(root);
@@ -3803,7 +4751,9 @@ function init() {
                         queuedRoots.clear();
 
                         for (const root of roots) {
-                            processRoot(root);
+                            try {
+                                processRoot(root);
+                            } catch (_) {}
                         }
                     }
 
@@ -3826,6 +4776,7 @@ function init() {
                         featureSettings = normalizeFeatureSettings(nextSettings);
                         writeBrowserSettings(featureSettings);
 
+                        applyBas1874MarketplacePreference();
                         setBodyFlags();
 
                         if (!featureSettings.betterMarketplace) {
@@ -3842,6 +4793,19 @@ function init() {
 
                         if (!featureSettings.subDubIcons) {
                             cleanupAllMediaBadges(document);
+                        }
+
+                        if (!featureSettings.useBas1874Marketplace) {
+                            cleanupMarketplaceStatusSources(document);
+                            cleanupMarketplaceStatusSections(document);
+                            document.querySelectorAll('.ama-marketplace-extra').forEach(el => el.remove());
+                            document.querySelectorAll('.ama-installed-marketplace-extra').forEach(el => el.remove());
+                            document.querySelectorAll('[data-ama-marketplace-extra-enhanced]').forEach(el => {
+                                delete el.dataset.amaMarketplaceExtraEnhanced;
+                            });
+                            document.querySelectorAll('[data-ama-installed-marketplace-extra-enhanced]').forEach(el => {
+                                delete el.dataset.amaInstalledMarketplaceExtraEnhanced;
+                            });
                         }
 
                         scheduleRoot(document.body || document.documentElement);
@@ -3871,6 +4835,7 @@ function init() {
 
                     setBodyFlags();
                     writeBrowserSettings(featureSettings);
+                    applyBas1874MarketplacePreference();
                     processRoot(document);
 
                     const observer = new MutationObserver((mutations) => {

@@ -18,24 +18,35 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 
 | Extension | Version | ID | Description |
 | --- | --- | --- | --- |
-| SeaUtils Kolex06-Version | 1.2.70 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
+| SeaUtils Kolex06-Version | 1.2.71 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
 | AniList Notifications Kolex06-Version | 1.0.15 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
 | AsunaTracks Sync | 0.1.22 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
 
-SeaUtils Kolex06-Version is the current Kolex06 version of SeaUtils.
+SeaUtils Kolex06-Version is the current Kolex06 version of SeaUtils. It focuses on making Seanime's marketplace easier to browse, adding better catalog popups, and keeping carousel/media-card tweaks configurable.
 
 Features include:
 
 - Better marketplace and Full Catalog layout.
 - Combined Full Catalog for Plugins, Anime torrents, Manga, and Online streaming, grouped by author.
+- Per-section View All popups that use the same author grouping as Full Catalog.
 - Horizontal carousel rows for media grids.
 - Sub/dub and captions badges on media cards.
 - Update highlighting for extensions with a newer version available, cleared after updating.
 - Tray preferences for turning SeaUtils features on or off.
 - Full Catalog actions for installed extension info, code, documentation, and preferences when available.
-- Per-section View All popups group rows like Full Catalog.
+- Optional Bas1874 Marketplace switch with extra status and scan metadata on marketplace cards.
+- Broken and Deprecated marketplace groups pinned to the bottom when Bas1874 metadata is enabled.
+
+When Bas1874 marketplace metadata is enabled, supported marketplace cards can show:
+
+- Working, Broken, Deprecated, and Official status badges.
+- VirusTotal link metadata when a permalink exists.
+- Scanned version and last working version.
+- Flag count metadata.
+
+Broken and Deprecated entries are moved into their own groups so normal marketplace sections stay cleaner. View All / Full Catalog keeps the same action buttons for installed extensions, code, preferences, documentation, and more details when those actions are available.
 
 Direct manifest:
 
