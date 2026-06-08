@@ -16,11 +16,19 @@ Kolex06-styled Seanime plugin for building a personal Watch Next anime queue.
 - Optional auto-remove when an anime moves to your CURRENT list.
 - Migrates the original Watch Next extension storage keys on first load.
 
-## Version Info
+## Version History
 
-- `1.0.2` - Reduced AniList `429 Too Many Requests` errors by skipping unchanged entries, spacing AniList writes, and retrying once after rate-limit waits.
-- `1.0.1` - Fixed Seanime webview drag ordering with a dedicated drag handle and pointer-based reorder logic.
-- `1.0.0` - Initial GitHub release of Watch Next Kolex06-Version.
+### 1.0.2
+
+- Reduced AniList `429 Too Many Requests` errors by skipping unchanged entries, spacing AniList writes, and retrying once after rate-limit waits.
+
+### 1.0.1
+
+- Fixed Seanime webview drag ordering with a dedicated drag handle and pointer-based reorder logic.
+
+### 1.0.0
+
+- Initial GitHub release of Watch Next Kolex06-Version.
 
 ## Install
 
