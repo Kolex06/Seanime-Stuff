@@ -754,6 +754,23 @@ function init() {
                 margin-top: 10px !important;
             }
 
+            body[data-ama-better-marketplace="true"] .ama-status-normal-grid {
+                display: grid !important;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+                gap: 16px !important;
+                padding: 10px 40px 22px 40px !important;
+                margin: 0 !important;
+                width: 100% !important;
+                overflow: visible !important;
+                cursor: default !important;
+            }
+
+            body[data-ama-better-marketplace="true"] .ama-status-normal-grid .ama-catalog-card-wrap {
+                flex: none !important;
+                width: 100% !important;
+                max-width: none !important;
+            }
+
             body[data-ama-better-marketplace="true"] .ama-status-source-hidden {
                 display: none !important;
             }
@@ -1771,9 +1788,15 @@ function init() {
                         }
 
                         function isEnabled() {
-                            return el.dataset.amaDragFeature === 'betterMarketplace'
-                                ? !!featureSettings.betterMarketplace
-                                : areCarouselsEnabledForCurrentPage();
+                            if (el.dataset.amaDragFeature === 'betterMarketplace') {
+                                return !!featureSettings.betterMarketplace;
+                            }
+
+                            if (el.dataset.amaDragFeature === 'extensionsCarousel') {
+                                return areExtensionCarouselsEnabled();
+                            }
+
+                            return areCarouselsEnabledForCurrentPage();
                         }
 
                         function stopDrag(pointerId) {
@@ -4208,9 +4231,30 @@ function init() {
                         viewBtn.onpointerdown = openStatusCatalog;
                     }
 
+                    function syncMarketplaceStatusSectionLayout(section) {
+                        if (!section || !section.querySelector) return;
+
+                        const grid = section.querySelector('.grid');
+                        if (!grid) return;
+
+                        if (areExtensionCarouselsEnabled()) {
+                            grid.classList.add('ama-extension-carousel');
+                            grid.classList.remove('ama-status-normal-grid');
+                            makeDraggableScroller(grid, 'extensionsCarousel');
+                            return;
+                        }
+
+                        grid.classList.remove('ama-extension-carousel');
+                        grid.classList.remove('ama-drag-pending');
+                        grid.classList.remove('ama-dragging');
+                        grid.classList.add('ama-status-normal-grid');
+                        grid.dataset.amaDragFeature = 'extensionsCarousel';
+                    }
+
                     function getOrCreateMarketplaceStatusSection(title) {
                         let section = document.querySelector('[data-ama-status-section="' + title + '"]');
                         if (section) {
+                            syncMarketplaceStatusSectionLayout(section);
                             bindMarketplaceStatusViewAll(section, title);
                             return section;
                         }
@@ -4244,12 +4288,12 @@ function init() {
                         header.appendChild(left);
 
                         const grid = document.createElement('div');
-                        grid.className = 'grid ama-extension-carousel';
+                        grid.className = 'grid';
 
                         card.appendChild(header);
                         card.appendChild(grid);
                         parent.appendChild(card);
-                        makeDraggableScroller(grid, 'betterMarketplace');
+                        syncMarketplaceStatusSectionLayout(card);
                         bindMarketplaceStatusViewAll(card, title);
 
                         return card;
@@ -4336,7 +4380,7 @@ function init() {
                             }
 
                             section.hidden = false;
-                            makeDraggableScroller(grid, 'betterMarketplace');
+                            syncMarketplaceStatusSectionLayout(section);
                         });
 
                         const sections = getMarketplaceSections(false);
@@ -4790,6 +4834,10 @@ function init() {
                         if (!areExtensionCarouselsEnabled()) {
                             cleanupExtensionCarousels(document);
                         }
+
+                        document.querySelectorAll('.ama-status-section').forEach(section => {
+                            syncMarketplaceStatusSectionLayout(section);
+                        });
 
                         if (!featureSettings.subDubIcons) {
                             cleanupAllMediaBadges(document);
