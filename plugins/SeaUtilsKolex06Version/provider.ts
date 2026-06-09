@@ -2260,6 +2260,11 @@ function init() {
                         return match ? match[0] : '';
                     }
 
+                    function getLastVersionText(value) {
+                        const matches = String(value || '').match(/\d+(?:\.\d+){1,3}/g);
+                        return matches && matches.length ? matches[matches.length - 1] : '';
+                    }
+
                     function compareVersionText(a, b) {
                         const left = normalizeVersionText(a);
                         const right = normalizeVersionText(b);
@@ -2339,43 +2344,171 @@ function init() {
                         }
                     }
 
+                    const updateGlowSuppressions = new Map();
+
+                    function getUpdateSuppressionKeys(data) {
+                        const id = normalizeMarketplaceLookupText(data && data.id);
+                        const name = normalizeMarketplaceLookupText(data && data.name);
+
+                        return [id, name].filter((value, index, list) => value && list.indexOf(value) === index);
+                    }
+
+                    function isUpdateGlowSuppressed(data) {
+                        const keys = getUpdateSuppressionKeys(data);
+                        if (!keys.length) return false;
+
+                        return keys.some(key => {
+                            const expiresAt = updateGlowSuppressions.get(key) || 0;
+                            if (!expiresAt) return false;
+
+                            if (Date.now() > expiresAt) {
+                                updateGlowSuppressions.delete(key);
+                                return false;
+                            }
+
+                            return true;
+                        });
+                    }
+
+                    function suppressUpdateGlowForData(data) {
+                        getUpdateSuppressionKeys(data).forEach(key => {
+                            updateGlowSuppressions.set(key, Date.now() + 30000);
+                        });
+                    }
+
                     function markExtensionUpdateState(card) {
                         if (!card || !card.querySelectorAll) return false;
 
                         const data = getExtensionCardData(card);
                         const hasUpdate = hasExtensionUpdateText(getExtensionUpdateText(card));
-                        const value = hasUpdate ? 'true' : 'false';
+                        const shouldShowUpdate = hasUpdate && !isUpdateGlowSuppressed(data);
+                        const value = shouldShowUpdate ? 'true' : 'false';
 
-                        applyExtensionUpdateStyle(card, hasUpdate);
+                        applyExtensionUpdateStyle(card, shouldShowUpdate);
 
                         const wrapper = card.closest('.ama-catalog-card-wrap');
                         if (wrapper) {
-                            wrapper.dataset.amaUpdateAvailable = value;
+                            if (shouldShowUpdate) {
+                                wrapper.dataset.amaUpdateAvailable = 'true';
+                            } else {
+                                delete wrapper.dataset.amaUpdateAvailable;
+                            }
                         }
 
-                        if (!hasUpdate && data.version) {
-                            findExtensionForCard(card).then(extension => {
-                                if (!card.isConnected) return;
+                        return shouldShowUpdate;
+                    }
 
-                                const installedVersion = extension && extension.version;
-                                const marketplaceVersion = data.version;
-                                const hasVersionUpdate = compareVersionText(marketplaceVersion, installedVersion) > 0;
-                                const nextValue = hasVersionUpdate ? 'true' : 'false';
+                    function clearExtensionUpdateStateForData(data) {
+                        const targetId = normalizeMarketplaceLookupText(data && data.id);
+                        const targetName = normalizeMarketplaceLookupText(data && data.name);
 
-                                applyExtensionUpdateStyle(card, hasVersionUpdate);
+                        document.querySelectorAll('.group\\\\/extension-card').forEach(card => {
+                            const cardData = getExtensionCardData(card);
+                            const cardId = normalizeMarketplaceLookupText(cardData.id);
+                            const cardName = normalizeMarketplaceLookupText(cardData.name);
+                            const matches = (
+                                (targetId && cardId === targetId) ||
+                                (targetName && cardName === targetName)
+                            );
 
-                                const nextWrapper = card.closest('.ama-catalog-card-wrap');
-                                if (nextWrapper) {
-                                    if (hasVersionUpdate) {
-                                        nextWrapper.dataset.amaUpdateAvailable = 'true';
-                                    } else {
-                                        delete nextWrapper.dataset.amaUpdateAvailable;
-                                    }
-                                }
-                            }).catch(() => {});
+                            if (!matches) return;
+
+                            applyExtensionUpdateStyle(card, false);
+
+                            const wrapper = card.closest && card.closest('.ama-catalog-card-wrap');
+                            if (wrapper) {
+                                delete wrapper.dataset.amaUpdateAvailable;
+                            }
+                        });
+                    }
+
+                    function refreshExtensionUpdateStateForData(data) {
+                        suppressUpdateGlowForData(data);
+                        clearExtensionUpdateStateForData(data);
+
+                        const recheck = () => {
+                            clearExtensionCache();
+
+                            document.querySelectorAll('.group\\\\/extension-card').forEach(card => {
+                                const cardData = getExtensionCardData(card);
+                                const matches = (
+                                    normalizeMarketplaceLookupText(data && data.id) && normalizeMarketplaceLookupText(cardData.id) === normalizeMarketplaceLookupText(data && data.id)
+                                ) || (
+                                    normalizeMarketplaceLookupText(data && data.name) && normalizeMarketplaceLookupText(cardData.name) === normalizeMarketplaceLookupText(data && data.name)
+                                );
+
+                                if (matches) markExtensionUpdateState(card);
+                            });
+                        };
+
+                        setTimeout(recheck, 350);
+                        setTimeout(recheck, 1200);
+                        setTimeout(recheck, 2500);
+                    }
+
+                    async function refreshExtensionUpdateStateIfInstalled(card, data) {
+                        if (!card || !data) return;
+
+                        const updateTargetVersion = getLastVersionText(getExtensionUpdateText(card));
+
+                        if (!updateTargetVersion) {
+                            refreshExtensionUpdateStateForData(data);
+                            return;
                         }
 
-                        return hasUpdate;
+                        clearExtensionCache();
+
+                        try {
+                            const extension = await findExtensionForCard(card);
+                            const installedVersion = extension && extension.version;
+
+                            if (installedVersion && compareVersionText(installedVersion, updateTargetVersion) >= 0) {
+                                refreshExtensionUpdateStateForData(data);
+                            }
+                        } catch (_) {}
+                    }
+
+                    function isNativeExtensionUpdateButton(button) {
+                        if (!button) return false;
+
+                        const text = [
+                            button.textContent || '',
+                            button.getAttribute && button.getAttribute('aria-label') || '',
+                            button.getAttribute && button.getAttribute('title') || ''
+                        ].join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+
+                        if (!text) return false;
+                        if (text.includes('check for update')) return false;
+
+                        return (
+                            text.includes('install update') ||
+                            text.includes('install extension update') ||
+                            text === 'update' ||
+                            text.includes(' update ')
+                        );
+                    }
+
+                    function handleNativeExtensionUpdateClick(event) {
+                        const target = event && event.target;
+                        const button = target && target.closest ? target.closest('button, [role="button"]') : null;
+                        if (!button) return;
+                        if (button.closest && button.closest('.ama-clone-action, .ama-clone-actions')) return;
+
+                        const card = button.closest && button.closest('.group\\\\/extension-card');
+                        if (!card) return;
+                        if (card.closest && card.closest('.ama-modal')) return;
+                        if (!card.dataset.amaUpdateAvailable && !(card.closest && card.closest('[data-ama-update-available="true"]'))) return;
+
+                        const isExplicitUpdateButton = isNativeExtensionUpdateButton(button);
+                        const hasUpdateText = hasExtensionUpdateText(getExtensionUpdateText(card));
+                        if (!isExplicitUpdateButton && !hasUpdateText) return;
+
+                        const data = getExtensionCardData(card);
+                        if (!getUpdateSuppressionKeys(data).length) return;
+
+                        [600, 1400, 2800, 5000].forEach(delay => {
+                            setTimeout(() => refreshExtensionUpdateStateIfInstalled(card, data), delay);
+                        });
                     }
 
                     function markMarketplaceExtensionCards(root) {
@@ -3783,6 +3916,9 @@ function init() {
                                 })
                             });
 
+                            clearExtensionCache();
+                            refreshExtensionUpdateStateForData(data);
+
                             if (modal) {
                                 const message = json && json.message ? json.message : 'Extension installed.';
                                 modal.innerHTML =
@@ -4879,6 +5015,7 @@ function init() {
 
                     window.addEventListener('popstate', refreshForRouteChange);
                     window.addEventListener('hashchange', refreshForRouteChange);
+                    document.addEventListener('click', handleNativeExtensionUpdateClick, true);
                     setInterval(refreshForRouteChange, 500);
 
                     setBodyFlags();

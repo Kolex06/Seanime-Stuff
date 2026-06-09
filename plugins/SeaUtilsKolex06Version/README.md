@@ -2,6 +2,8 @@
 
 SeaUtils Kolex06-Version is a Seanime utility extension by Kolex06. It improves the Extensions marketplace, adds better catalog popups, gives media grids optional carousel behavior, and adds small quality-of-life badges for anime cards.
 
+Version `1.2.73` keeps update glow visible before updating, then clears it after native update actions finish by checking the installed version.
+
 ## Features
 
 - Better Marketplace layout with searchable rows and a Full Catalog popup.
@@ -59,6 +61,14 @@ Broken and Deprecated entries are also collected into their own marketplace grou
 Virus scan metadata is informational only. You should still review extensions yourself before installing them.
 
 ## Version History
+
+### 1.2.73
+- Clears the blue update highlight immediately after an extension update/install succeeds.
+- Keeps normal pre-update glow visible.
+- Detects native update clicks from any button inside a glowing update card.
+- Clears update glow only after the installed version reaches the update target.
+- Rechecks several times so slow Seanime redraws still clear without leaving the Extensions page.
+- Refreshes matching Full Catalog/View All/status clone cards after update actions.
 
 ### 1.2.72
 - Fixes Broken/Deprecated Extensions sections so they use normal grid-style when Carousels: Extensions is off.
