@@ -18,6 +18,9 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.16
+- Handles AniList media macros like `img100%(...)`, `pic(...)`, and `gif50%(...)` without leaving the tag text around the image.
+
 ### 1.0.15
 - added `+` for when you have more then `99` Notifactions 
 - Keeps the sidebar unread badge capped at `99+`.

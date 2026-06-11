@@ -2191,7 +2191,8 @@ function init() {
 							var text = stripHtml(html);
 							var parts = [];
 							var seenMedia = {};
-							var pattern = new RegExp('(?:img|image|ing)\\\\d*\\\\(\\\\s*([^)]+?)\\\\s*\\\\)|!\\\\[[^\\\\]]*\\\\]\\\\(\\\\s*([^)]+?)\\\\s*\\\\)|(https?:\\\\/\\\\/[^\\\\s)]+\\\\.(?:png|apng|jpe?g|gif|gifv|webp|avif|svg|bmp|mp4|webm|mov|m4v|ogv)(?:\\\\?[^\\\\s)]*)?)', 'ig');
+							var mediaMacro = '(?:img|image|ing|pic|gif)(?:\\\\d+%?|%)?\\\\s*\\\\(\\\\s*([^)]*?)\\\\s*\\\\)';
+							var pattern = new RegExp(mediaMacro + '|!\\\\[[^\\\\]]*\\\\]\\\\(\\\\s*([^)]+?)\\\\s*\\\\)|(https?:\\\\/\\\\/[^\\\\s)]+\\\\.(?:png|apng|jpe?g|gif|gifv|webp|avif|svg|bmp|mp4|webm|mov|m4v|ogv)(?:\\\\?[^\\\\s)]*)?)', 'ig');
 							var lastIndex = 0;
 							var match;
 							while ((match = pattern.exec(text)) !== null) {
