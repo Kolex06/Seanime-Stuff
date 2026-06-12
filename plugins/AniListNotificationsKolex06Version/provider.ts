@@ -637,8 +637,9 @@ function init() {
 				"pointer-events:auto",
 			].join(";"));
 
-			const card = await ctx.dom.createElement("button");
-			card.setAttribute("type", "button");
+			const card = await ctx.dom.createElement("div");
+			card.setAttribute("role", "button");
+			card.setAttribute("tabindex", "0");
 			card.setAttribute("data-anilist-notifications-global-card", "true");
 			card.setCssText([
 				"appearance:none",
@@ -661,6 +662,14 @@ function init() {
 				"backdrop-filter:blur(16px)",
 			].join(";"));
 			card.addEventListener("click", openGlobalNotificationPopup);
+			card.addEventListener("keydown", (event: any) => {
+				const key = String(event?.key || "");
+				if (key !== "Enter" && key !== " ") return;
+				try {
+					event?.preventDefault?.();
+				} catch (_) {}
+				openGlobalNotificationPopup();
+			});
 
 			const image = await ctx.dom.createElement("div");
 			image.setAttribute("data-anilist-notifications-global-image", "true");
@@ -701,24 +710,38 @@ function init() {
 			const close = await ctx.dom.createElement("button");
 			close.setAttribute("type", "button");
 			close.setAttribute("aria-label", "Close AniList notification popup");
+			close.setAttribute("title", "Close");
 			close.setText("x");
-			close.setCssText([
-				"appearance:none",
-				"-webkit-appearance:none",
-				"width:28px",
-				"height:28px",
-				"display:inline-flex",
-				"align-items:center",
-				"justify-content:center",
-				"border:1px solid rgba(226,232,240,.18)",
-				"border-radius:8px",
-				"background:rgba(255,255,255,.06)",
-				"color:#f8fafc",
-				"font-size:14px",
-				"font-weight:900",
-				"line-height:1",
-				"cursor:pointer",
-			].join(";"));
+			const setCloseStyle = (state: "idle" | "hover" | "active") => {
+				const hover = state === "hover";
+				const active = state === "active";
+				close.setCssText([
+					"appearance:none",
+					"-webkit-appearance:none",
+					"width:28px",
+					"height:28px",
+					"display:inline-flex",
+					"align-items:center",
+					"justify-content:center",
+					`border:1px solid ${hover || active ? "rgba(125,211,252,.95)" : "rgba(226,232,240,.18)"}`,
+					"border-radius:8px",
+					`background:${active ? "rgba(14,165,233,.98)" : hover ? "rgba(125,211,252,.24)" : "rgba(255,255,255,.06)"}`,
+					`color:${active ? "#00111d" : "#f8fafc"}`,
+					"font-size:14px",
+					"font-weight:900",
+					"line-height:1",
+					"cursor:pointer",
+					`box-shadow:${hover || active ? "0 0 0 3px rgba(14,165,233,.18)" : "none"}`,
+					`transform:${active ? "scale(.94)" : "scale(1)"}`,
+				].join(";"));
+			};
+			setCloseStyle("idle");
+			close.addEventListener("mouseenter", () => setCloseStyle("hover"));
+			close.addEventListener("mouseleave", () => setCloseStyle("idle"));
+			close.addEventListener("focus", () => setCloseStyle("hover"));
+			close.addEventListener("blur", () => setCloseStyle("idle"));
+			close.addEventListener("mousedown", () => setCloseStyle("active"));
+			close.addEventListener("mouseup", () => setCloseStyle("hover"));
 			close.addEventListener("click", (event: any) => {
 				try {
 					event?.preventDefault?.();
