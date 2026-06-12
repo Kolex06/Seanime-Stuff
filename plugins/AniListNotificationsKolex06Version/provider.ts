@@ -616,6 +616,24 @@ function init() {
 		}
 
 		async function ensureGlobalNotificationPopup() {
+			let suppressGlobalPopupOpenUntil = 0;
+			const claimClosePopupClick = (event: any) => {
+				suppressGlobalPopupOpenUntil = Date.now() + 800;
+				try {
+					event?.preventDefault?.();
+					event?.stopPropagation?.();
+					event?.stopImmediatePropagation?.();
+				} catch (_) {}
+			};
+			const isClosePopupClick = (event: any) => {
+				if (Date.now() < suppressGlobalPopupOpenUntil) return true;
+				try {
+					const target = event?.target;
+					return !!(target && target.closest && target.closest('[data-anilist-notifications-global-close="true"]'));
+				} catch (_) {
+					return false;
+				}
+			};
 			let root = await ctx.dom.queryOne('[data-anilist-notifications-global-popup="true"]');
 			if (root) return root;
 
@@ -661,8 +679,15 @@ function init() {
 				"cursor:pointer",
 				"backdrop-filter:blur(16px)",
 			].join(";"));
-			card.addEventListener("click", openGlobalNotificationPopup);
+			card.addEventListener("click", (event: any) => {
+				if (isClosePopupClick(event)) {
+					claimClosePopupClick(event);
+					return;
+				}
+				openGlobalNotificationPopup();
+			});
 			card.addEventListener("keydown", (event: any) => {
+				if (isClosePopupClick(event)) return;
 				const key = String(event?.key || "");
 				if (key !== "Enter" && key !== " ") return;
 				try {
@@ -711,6 +736,7 @@ function init() {
 			close.setAttribute("type", "button");
 			close.setAttribute("aria-label", "Close AniList notification popup");
 			close.setAttribute("title", "Close");
+			close.setAttribute("data-anilist-notifications-global-close", "true");
 			close.setText("x");
 			const setCloseStyle = (state: "idle" | "hover" | "active") => {
 				const hover = state === "hover";
@@ -731,8 +757,10 @@ function init() {
 					"font-weight:900",
 					"line-height:1",
 					"cursor:pointer",
+					"position:relative",
+					"z-index:2",
 					`box-shadow:${hover || active ? "0 0 0 3px rgba(14,165,233,.18)" : "none"}`,
-					`transform:${active ? "scale(.94)" : "scale(1)"}`,
+					"transform:none",
 				].join(";"));
 			};
 			setCloseStyle("idle");
@@ -740,13 +768,29 @@ function init() {
 			close.addEventListener("mouseleave", () => setCloseStyle("idle"));
 			close.addEventListener("focus", () => setCloseStyle("hover"));
 			close.addEventListener("blur", () => setCloseStyle("idle"));
-			close.addEventListener("mousedown", () => setCloseStyle("active"));
-			close.addEventListener("mouseup", () => setCloseStyle("hover"));
+			close.addEventListener("pointerdown", claimClosePopupClick);
+			close.addEventListener("pointerup", (event: any) => {
+				claimClosePopupClick(event);
+				setCloseStyle("hover");
+				void hideGlobalNotificationPopup();
+			});
+			close.addEventListener("mousedown", (event: any) => {
+				claimClosePopupClick(event);
+				setCloseStyle("active");
+			});
+			close.addEventListener("mouseup", (event: any) => {
+				claimClosePopupClick(event);
+				setCloseStyle("hover");
+				void hideGlobalNotificationPopup();
+			});
+			close.addEventListener("keydown", (event: any) => {
+				const key = String(event?.key || "");
+				if (key !== "Enter" && key !== " ") return;
+				claimClosePopupClick(event);
+				void hideGlobalNotificationPopup();
+			});
 			close.addEventListener("click", (event: any) => {
-				try {
-					event?.preventDefault?.();
-					event?.stopPropagation?.();
-				} catch (_) {}
+				claimClosePopupClick(event);
 				void hideGlobalNotificationPopup();
 			});
 
