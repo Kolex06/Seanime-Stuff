@@ -159,35 +159,6 @@ Features include:
 - Optional auto-remove when queued anime moves to CURRENT.
 - Migration from the original Watch Next storage keys on first load.
 
-### Version History
-
-#### 1.0.5
-
-- Swapped the Move down and Open anime row action positions.
-
-#### 1.0.4
-
-- Changed the Watch Next row Open and Remove actions to compact icon buttons with hover labels.
-
-#### 1.0.3
-
-- Restored the `1.0.1` full AniList order sync behavior so manual sync and auto-sync both rewrite the queue order.
-- AniList writes are spaced out to reduce 429 Too Many Requests.
-- If AniList still returns 429, the plugin waits and retries once instead of instantly failing.
-
-#### 1.0.2
-
-- AniList writes are spaced out to reduce 429 Too Many Requests.
-- If AniList still returns 429, the plugin waits and retries once instead of instantly failing.
-
-#### 1.0.1
-
-- Fixed Seanime webview drag ordering with a dedicated drag handle and pointer-based reorder logic.
-
-#### 1.0.0
-
-- Initial GitHub release of Watch Next Kolex06-Version.
-
 Direct manifest:
 
 ```text
