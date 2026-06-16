@@ -136,7 +136,7 @@ function init() {
             } catch (_) {}
         }
 
-        function updateSetting<K extends keyof AmaSettings>(key: K, value: boolean) {
+        function updateSetting<K extends keyof AmaSettings>(key: K, value: AmaSettings[K]) {
             const current = settingsState.get()
             const next: AmaSettings = {
                 ...current,
@@ -252,6 +252,465 @@ function init() {
         })
 
         const initialFeatureSettings = settingsState.get()
+
+        const SCHEDULE_EVENT_QUERY = '[data-schedule-calendar-event-item-link], [data-schedule-calendar-event-item-content], [data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-episode], [data-schedule-calendar-event-item-finale-icon], [data-schedule-calendar-event-item], [data-schedule-event-item], [data-schedule-media-id]'
+        const SERVER_SCHEDULE_EVENT_QUERY = '[data-schedule-calendar-event-item-link], [data-schedule-calendar-event-item-content], [data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-episode], [data-schedule-calendar-event-item-finale-icon], [data-schedule-calendar-event-item], [data-schedule-calendar-event-item-root], [data-schedule-event-item], [data-schedule-media-id]'
+        const SCHEDULE_SETTINGS_BUTTON_QUERY = '[data-schedule-calendar-header-button-settings="true"]'
+        const SCHEDULE_TOKEN_STORAGE_KEY = 'ama-ui-tweaks.animeScheduleApiToken'
+        const ANIME_SCHEDULE_API_BASE_URL = 'https://animeschedule.net/api/v3'
+
+        function normalizeServerAnimeScheduleToken(value: any): string {
+            return String(value || "")
+                .trim()
+                .replace(/^["']|["']$/g, "")
+                .replace(/^authorization\s*:\s*/i, "")
+                .replace(/^bearer\s+/i, "")
+                .trim()
+        }
+
+        function getServerStorageString(key: string): string {
+            try {
+                const storage = getStorageApi()
+                if (storage && typeof storage.get === "function") {
+                    const value = storage.get<string>(key)
+                    return normalizeServerAnimeScheduleToken(value)
+                }
+            } catch (_) {}
+
+            return ""
+        }
+
+        function setServerStorageString(key: string, value: string) {
+            try {
+                const storage = getStorageApi()
+                if (storage && typeof storage.set === "function") {
+                    storage.set(key, normalizeServerAnimeScheduleToken(value))
+                }
+            } catch (_) {}
+        }
+
+        let serverAnimeScheduleApiToken = getServerStorageString(SCHEDULE_TOKEN_STORAGE_KEY)
+        const serverDubTimetableCache: Record<string, any[] | null> = {}
+        const serverDubTimetablePromises: Record<string, Promise<any[] | null>> = {}
+        let serverScheduleRefreshRunning = false
+
+        async function setServerScheduleApiStatus(status: string, detail: string) {
+            try {
+                const body = await ctx.dom.queryOne("body")
+                if (!body) return
+                body.setAttribute("data-ama-server-schedule-api-status", status)
+                body.setAttribute("data-ama-server-schedule-api-detail", detail || "")
+            } catch (_) {}
+        }
+
+        function normalizeServerId(value: any): string {
+            if (value === null || value === undefined) return ""
+            const text = String(value).trim()
+            if (!text) return ""
+            const numeric = text.match(/\d+/)
+            return numeric ? numeric[0] : text
+        }
+
+        function serverGetAnilistIdFromHref(href: string): string {
+            if (!href) return ""
+
+            try {
+                const parsed = new URL(href, "http://localhost")
+                const names = ["anilistId", "anilist_id", "aniListId", "mediaId", "media_id", "animeId", "anime_id", "id"]
+                for (const name of names) {
+                    const id = normalizeServerId(parsed.searchParams.get(name))
+                    if (id) return id
+                }
+
+                const path = parsed.pathname || ""
+                const match = path.match(/(?:\/anime\/|\/entry\/|\/media\/|\/details\/)(?:anime\/)?(\d+)(?:\/|$)/i)
+                return match && match[1] ? match[1] : ""
+            } catch (_) {
+                const match = String(href).match(/[?&#](?:anilistId|anilist_id|aniListId|mediaId|media_id|animeId|anime_id|id)=(\d+)/i)
+                return match && match[1] ? match[1] : ""
+            }
+        }
+
+        function normalizeServerEpisodeNumber(value: any): string {
+            const text = String(value === null || value === undefined ? "" : value).trim()
+            if (!text) return ""
+            const direct = text.match(/^\d+(?:\.\d+)?$/)
+            if (direct) return String(Number(direct[0])).replace(/\.0$/, "")
+            const match = text.match(/(?:episode|ep\.?|e)\s*#?\s*(\d+(?:\.\d+)?)/i)
+            return match && match[1] ? String(Number(match[1])).replace(/\.0$/, "") : ""
+        }
+
+        function serverParseDate(value: any): Date | null {
+            const text = String(value || "").trim()
+            if (!text || text.indexOf("0001-01-01") === 0) return null
+            const date = new Date(text)
+            return Number.isNaN(date.getTime()) ? null : date
+        }
+
+        function serverDatesSameLocalDay(a: Date | null, b: Date | null): boolean {
+            if (!a || !b) return false
+            return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+        }
+
+        function canUseServerScheduleFallback(scheduleDate: Date | null): boolean {
+            if (!scheduleDate || Number.isNaN(scheduleDate.getTime())) return false
+
+            const currentWeekStart = new Date()
+            currentWeekStart.setHours(0, 0, 0, 0)
+            const dayOffset = (currentWeekStart.getDay() + 6) % 7
+            currentWeekStart.setDate(currentWeekStart.getDate() - dayOffset)
+
+            const scheduleDay = new Date(scheduleDate.getTime())
+            scheduleDay.setHours(0, 0, 0, 0)
+
+            return scheduleDay.getTime() < currentWeekStart.getTime()
+        }
+
+        function serverIsoWeekInfo(date: Date | null): { year: number, week: number } {
+            const source = date && !Number.isNaN(date.getTime()) ? date : new Date()
+            const utc = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth(), source.getUTCDate()))
+            const day = utc.getUTCDay() || 7
+            utc.setUTCDate(utc.getUTCDate() + 4 - day)
+            const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1))
+            const week = Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+            return { year: utc.getUTCFullYear(), week }
+        }
+
+        function serverFlattenObjects(value: any, result: any[], depth: number) {
+            if (!value || depth > 8) return
+            if (Array.isArray(value)) {
+                value.forEach(item => serverFlattenObjects(item, result, depth + 1))
+                return
+            }
+            if (typeof value !== "object") return
+            result.push(value)
+            Object.keys(value).forEach(key => {
+                const child = value[key]
+                if (child && typeof child === "object") serverFlattenObjects(child, result, depth + 1)
+            })
+        }
+
+        function serverEntryAnilistId(entry: any): string {
+            if (!entry || typeof entry !== "object") return ""
+            const numericId = normalizeServerId(entry.id)
+            if (numericId && (entry.idMal || entry.episode || entry.format || entry.duration)) return numericId
+            const direct = normalizeServerId(entry.anilistId || entry.anilistID || entry.aniListId || entry.anilist_id || entry.mediaId || entry.media_id || entry.idAniList)
+            if (direct) return direct
+            const websites = entry.websites || {}
+            return serverGetAnilistIdFromHref(websites.aniList || websites.anilist || entry.aniList || entry.anilist || "")
+        }
+
+        function serverEntryEpisodeNumber(entry: any): string {
+            if (!entry || typeof entry !== "object") return ""
+            const values = [
+                entry.episodeNumber,
+                entry.episode,
+                entry.episodeNum,
+                entry.number,
+                entry.dubEpisode,
+                entry.dubEpisodeNumber,
+                entry.latestDubEpisode,
+                entry.latestDubEpisodeNumber,
+                entry.dubbedEpisode,
+                entry.currentEpisode,
+                entry.airingEpisode,
+                entry.episode && entry.episode.aired,
+                entry.episode && entry.episode.number,
+                entry.episode && entry.episode.episodeNumber,
+            ]
+
+            for (const value of values) {
+                const episode = normalizeServerEpisodeNumber(value)
+                if (episode) return episode
+            }
+
+            return ""
+        }
+
+        function serverEntryDate(entry: any): Date | null {
+            if (!entry || typeof entry !== "object") return null
+            return serverParseDate(entry.episodeDate || entry.date || entry.datetime || entry.airingAt || entry.airedAt || (entry.episode && (entry.episode.airedAt || entry.episode.date || entry.episode.datetime)))
+        }
+
+        function serverNormalizeTimetableEntries(data: any): any[] {
+            const objects: any[] = []
+            serverFlattenObjects(data, objects, 0)
+            return objects.filter(entry => serverEntryEpisodeNumber(entry) && serverEntryAnilistId(entry))
+        }
+
+        async function loadServerDubTimetableEntries(scheduleDate: Date | null): Promise<any[] | null> {
+            const token = normalizeServerAnimeScheduleToken(serverAnimeScheduleApiToken || await syncServerAnimeScheduleTokenFromDom())
+            if (!token) {
+                await setServerScheduleApiStatus("missing-token", "")
+                return null
+            }
+
+            const timezone = (() => {
+                try {
+                    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Oslo"
+                } catch (_) {
+                    return "Europe/Oslo"
+                }
+            })()
+            const weekInfo = serverIsoWeekInfo(scheduleDate)
+            const cacheKey = weekInfo.year + "-w" + weekInfo.week + "-" + timezone + "-" + (token ? "token" : "public")
+            if (Object.prototype.hasOwnProperty.call(serverDubTimetableCache, cacheKey)) return serverDubTimetableCache[cacheKey]
+            if (Object.prototype.hasOwnProperty.call(serverDubTimetablePromises, cacheKey)) return serverDubTimetablePromises[cacheKey]
+
+            serverDubTimetablePromises[cacheKey] = (async () => {
+                const headers: Record<string, string> = {
+                    Accept: "application/json",
+                }
+                if (token) headers.Authorization = "Bearer " + token
+
+                try {
+                    const response = await ctx.fetch(ANIME_SCHEDULE_API_BASE_URL + "/timetables/dub?year=" + encodeURIComponent(String(weekInfo.year)) + "&week=" + encodeURIComponent(String(weekInfo.week)) + "&tz=" + encodeURIComponent(timezone), {
+                        headers,
+                        noCloudflareBypass: true,
+                        timeout: 12,
+                    })
+
+                    if (!response.ok) {
+                        await setServerScheduleApiStatus("http-" + String(response.status), response.statusText || "")
+                        serverDubTimetableCache[cacheKey] = null
+                        return null
+                    }
+
+                    const entries = serverNormalizeTimetableEntries(response.json())
+                    await setServerScheduleApiStatus("loaded", String(entries.length))
+                    serverDubTimetableCache[cacheKey] = entries
+                    return entries
+                } catch (_) {
+                    await setServerScheduleApiStatus("failed", "")
+                    serverDubTimetableCache[cacheKey] = null
+                    return null
+                } finally {
+                    delete serverDubTimetablePromises[cacheKey]
+                }
+            })()
+
+            return serverDubTimetablePromises[cacheKey]
+        }
+
+        async function syncServerAnimeScheduleTokenFromDom(): Promise<string> {
+            try {
+                const body = await ctx.dom.queryOne("body")
+                const bodyToken = body ? normalizeServerAnimeScheduleToken(await body.getAttribute("data-ama-anime-schedule-api-token")) : ""
+                if (bodyToken) {
+                    serverAnimeScheduleApiToken = bodyToken
+                    setServerStorageString(SCHEDULE_TOKEN_STORAGE_KEY, bodyToken)
+                    return bodyToken
+                }
+            } catch (_) {}
+
+            try {
+                const input = await ctx.dom.queryOne('[data-ama-schedule-token-input="true"], [data-ama-schedule-token-field="true"] input')
+                const inputToken = input ? normalizeServerAnimeScheduleToken(await input.getProperty("value")) : ""
+                if (inputToken) {
+                    serverAnimeScheduleApiToken = inputToken
+                    setServerStorageString(SCHEDULE_TOKEN_STORAGE_KEY, inputToken)
+                    return inputToken
+                }
+            } catch (_) {}
+
+            return serverAnimeScheduleApiToken
+        }
+
+        async function getServerScheduleEventRoot(event: $ui.DOMElement): Promise<$ui.DOMElement> {
+            let current: $ui.DOMElement | null = event
+
+            for (let i = 0; current && i < 7; i++) {
+                const href = await current.getAttribute("href")
+                const isLink = !!href && (href.includes("/entry") || href.includes("id="))
+                const hasScheduleLink = await current.hasDataAttribute("schedule-calendar-event-item-link")
+                const hasScheduleItem = await current.hasDataAttribute("schedule-calendar-event-item")
+                const time = await current.queryOne("time[datetime], [datetime]")
+                const name = await current.queryOne('[data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-title], [data-schedule-event-title], [data-media-title]')
+
+                if (isLink || hasScheduleLink || hasScheduleItem || (time && name)) return current
+
+                current = await current.getParent({ identifyChildren: true })
+            }
+
+            return event
+        }
+
+        async function getServerScheduleEventInfo(event: $ui.DOMElement): Promise<{ root: $ui.DOMElement, anilistId: string, title: string, scheduleDate: Date | null }> {
+            const root = await getServerScheduleEventRoot(event)
+            let anilistId = normalizeServerId(await root.getDataAttribute("amaDubAnilistId"))
+            const link = await root.queryOne("a[href]")
+            const eventHref = await root.getAttribute("href")
+            const linkHref = link ? await link.getAttribute("href") : ""
+            anilistId = anilistId || serverGetAnilistIdFromHref(eventHref || "") || serverGetAnilistIdFromHref(linkHref || "")
+
+            const name = await root.queryOne('[data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-title], [data-schedule-event-title], [data-media-title]')
+            const title = name ? String(await name.getText() || "").trim() : String(await root.getText() || "").trim()
+
+            const time = await root.queryOne("time[datetime], [datetime]")
+            const scheduleDate = serverParseDate(time ? await time.getAttribute("datetime") : "")
+
+            return { root, anilistId, title, scheduleDate }
+        }
+
+        async function addServerScheduleDubBadge(event: $ui.DOMElement, details: { episodeNumber: string, episodeDate: string }) {
+            const existing = await event.queryOne(".ama-schedule-dub-badge-server")
+            if (existing) {
+                existing.setText("DUB Ep. " + details.episodeNumber)
+                existing.setAttribute("title", "Dub Ep. " + details.episodeNumber + (details.episodeDate ? " - " + details.episodeDate : ""))
+                return
+            }
+
+            const anchor = await event.queryOne('[data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-text], [data-schedule-calendar-event-item-title], [data-schedule-event-title], [data-media-title], a[href]')
+            if (!anchor) return
+
+            const badge = await ctx.dom.createElement("span")
+            badge.setText("DUB Ep. " + details.episodeNumber)
+            badge.setAttribute("class", "ama-media-badge dub ama-schedule-dub-badge-server")
+            badge.setAttribute("title", "Dub Ep. " + details.episodeNumber + (details.episodeDate ? " - " + details.episodeDate : ""))
+            badge.setAttribute("aria-label", "Dub Ep. " + details.episodeNumber)
+            badge.setCssText("display:inline-flex;align-items:center;justify-content:center;height:20px;min-width:32px;padding:0 6px;margin-left:6px;border-radius:999px;border:1px solid rgba(255,183,197,.7);color:#ffb7c5;background:rgba(255,183,197,.13);font-size:11px;font-weight:800;line-height:1;vertical-align:middle;")
+            anchor.after(badge)
+        }
+
+        async function removeServerScheduleDubBadge(event: $ui.DOMElement) {
+            const existing = await event.queryOne(".ama-schedule-dub-badge-server")
+            if (existing) existing.remove()
+        }
+
+        async function enhanceServerScheduleEvent(event: $ui.DOMElement): Promise<string> {
+            const info = await getServerScheduleEventInfo(event)
+            if (!info.anilistId || !info.scheduleDate) {
+                return "missing-info:id=" + (info.anilistId ? "yes" : "no") + ";date=" + (info.scheduleDate ? "yes" : "no")
+            }
+
+            if (canUseServerScheduleFallback(info.scheduleDate)) {
+                return "past-fallback"
+            }
+
+            const entries = await loadServerDubTimetableEntries(info.scheduleDate)
+            if (!Array.isArray(entries)) return "api-unavailable"
+
+            const match = entries.find(entry => {
+                if (String(serverEntryAnilistId(entry)) !== String(info.anilistId)) return false
+                const entryDate = serverEntryDate(entry)
+                return serverDatesSameLocalDay(entryDate, info.scheduleDate)
+            })
+
+            if (!match) {
+                await removeServerScheduleDubBadge(info.root)
+                return "no-match"
+            }
+
+            await addServerScheduleDubBadge(info.root, {
+                episodeNumber: serverEntryEpisodeNumber(match),
+                episodeDate: String((serverEntryDate(match) || {}).toISOString ? serverEntryDate(match)!.toISOString() : ""),
+            })
+            return "matched"
+        }
+
+        async function attachServerScheduleTokenInput(dialog: $ui.DOMElement) {
+            let input = await dialog.queryOne('[data-ama-schedule-token-input="true"]')
+            if (!input) {
+                input = await dialog.queryOne('[data-ama-schedule-token-field="true"] input')
+                if (input) input.setAttribute("data-ama-schedule-token-input", "true")
+            }
+
+            if (!input) {
+                return
+            } else {
+                const existingValue = normalizeServerAnimeScheduleToken(await input.getProperty("value"))
+                if (!serverAnimeScheduleApiToken && existingValue) {
+                    serverAnimeScheduleApiToken = existingValue
+                    setServerStorageString(SCHEDULE_TOKEN_STORAGE_KEY, existingValue)
+                }
+                input.setProperty("value", serverAnimeScheduleApiToken)
+            }
+
+            input.addEventListener("input", async () => {
+                const value = normalizeServerAnimeScheduleToken(await input!.getProperty("value"))
+                serverAnimeScheduleApiToken = value
+                setServerStorageString(SCHEDULE_TOKEN_STORAGE_KEY, value)
+                Object.keys(serverDubTimetableCache).forEach(key => delete serverDubTimetableCache[key])
+                Object.keys(serverDubTimetablePromises).forEach(key => delete serverDubTimetablePromises[key])
+            })
+            input.addEventListener("change", async () => {
+                const value = normalizeServerAnimeScheduleToken(await input!.getProperty("value"))
+                serverAnimeScheduleApiToken = value
+                setServerStorageString(SCHEDULE_TOKEN_STORAGE_KEY, value)
+                Object.keys(serverDubTimetableCache).forEach(key => delete serverDubTimetableCache[key])
+                Object.keys(serverDubTimetablePromises).forEach(key => delete serverDubTimetablePromises[key])
+            })
+        }
+
+        async function refreshServerScheduleDubBadges() {
+            if (serverScheduleRefreshRunning) return
+            serverScheduleRefreshRunning = true
+
+            try {
+                await setServerScheduleApiStatus("scanning", "")
+                await syncServerAnimeScheduleTokenFromDom()
+                const events = await ctx.dom.query(SERVER_SCHEDULE_EVENT_QUERY, { identifyChildren: true })
+                if (!events.length) {
+                    await setServerScheduleApiStatus("no-events", "")
+                    return
+                }
+
+                const candidates = await Promise.all(events.slice(0, 240).map(async event => {
+                    try {
+                        const info = await getServerScheduleEventInfo(event)
+                        return { event: info.root || event, scheduleDate: info.scheduleDate }
+                    } catch (_) {
+                        return { event, scheduleDate: null }
+                    }
+                }))
+
+                const seenCandidateIds: Record<string, boolean> = {}
+                const uniqueCandidates = candidates.filter(candidate => {
+                    const key = candidate.event && candidate.event.id ? candidate.event.id : ""
+                    if (!key) return true
+                    if (seenCandidateIds[key]) return false
+                    seenCandidateIds[key] = true
+                    return true
+                })
+
+                uniqueCandidates.sort((a, b) => {
+                    const aPast = canUseServerScheduleFallback(a.scheduleDate) ? 1 : 0
+                    const bPast = canUseServerScheduleFallback(b.scheduleDate) ? 1 : 0
+                    return aPast - bPast
+                })
+
+                const results = await Promise.all(uniqueCandidates.slice(0, 100).map(candidate => {
+                    return enhanceServerScheduleEvent(candidate.event).catch(() => "event-failed")
+                }))
+
+                const counts: Record<string, number> = {}
+                results.forEach(result => {
+                    const key = String(result || "unknown").split(":")[0]
+                    counts[key] = (counts[key] || 0) + 1
+                })
+
+                if (counts.matched) {
+                    await setServerScheduleApiStatus("matched", JSON.stringify(counts))
+                } else if (counts["no-match"]) {
+                    await setServerScheduleApiStatus("loaded-no-match", JSON.stringify(counts))
+                } else if (counts["api-unavailable"]) {
+                    await setServerScheduleApiStatus("api-unavailable", JSON.stringify(counts))
+                } else if (counts["past-fallback"]) {
+                    await setServerScheduleApiStatus("past-fallback", JSON.stringify(counts))
+                } else if (counts["missing-info"]) {
+                    await setServerScheduleApiStatus("missing-info", JSON.stringify(counts))
+                } else {
+                    await setServerScheduleApiStatus("scanned", JSON.stringify(counts))
+                }
+            } catch (_) {
+                await setServerScheduleApiStatus("scan-failed", "")
+            } finally {
+                serverScheduleRefreshRunning = false
+            }
+        }
+
+        // Disabled while the Schedule API integration is reworked; the browser-side
+        // Schedule fallback remains active and should not throw during Seanime startup.
 
         const carouselCSS = `
             body[data-ama-hide-file-names="true"] [data-episode-grid-item-filename="true"] {
@@ -615,6 +1074,13 @@ function init() {
 
             body[data-ama-subdub-icons="true"] .ama-media-badge.dub[hidden] {
                 display: none !important;
+            }
+
+            body[data-ama-subdub-icons="true"] .ama-schedule-dub-badge {
+                margin-left: 6px !important;
+                vertical-align: middle !important;
+                flex: 0 0 auto !important;
+                min-width: 28px !important;
             }
 
             body[data-ama-subdub-icons="false"] .ama-media-badges {
@@ -1296,12 +1762,22 @@ function init() {
 
                     const targetGridsQuery = '.grid[data-media-card-grid="true"], .grid[data-media-card-lazy-grid="true"]';
                     const mediaEntryCardQuery = '[data-media-entry-card-container="true"]';
+                    const scheduleEventQuery = '[data-schedule-calendar-event-item-link], [data-schedule-calendar-event-item-content], [data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-episode], [data-schedule-calendar-event-item-finale-icon], [data-schedule-calendar-event-item], [data-schedule-calendar-mobile-list-day-item-event-link], [data-schedule-calendar-mobile-list-day-item-event-content], [data-schedule-calendar-mobile-list-day-item-event-text], [data-schedule-calendar-mobile-list-day-item-event-episode], [data-schedule-calendar-mobile-list-day-item-event-icons], [data-schedule-event-item], [data-schedule-media-id]';
+                    const scheduleEntryLinkQuery = 'a[href^="/entry?id="], a[href*="/entry?id="]';
                     const cardQuery = '.UI-Card__root';
                     const arrowQuery = '.ama-carousel-nav-btn, .ama-manga-carousel-parent';
                     const randomSearchIconPath = 'M10 18a7.952 7.952 0 0 0 4.897-1.688l4.396 4.396 1.414-1.414-4.396-4.396A7.952 7.952 0 0 0 18 10c0-4.411-3.589-8-8-8s-8 3.589-8 8 3.589 8 8 8zm0-14c3.309 0 6 2.691 6 6s-2.691 6-6 6-6-2.691-6-6 2.691-6 6-6z';
-                    const dubFeedUrl = 'https://raw.githubusercontent.com/Bas1874/AniSchedule/refs/heads/master/raw/dub-episode-feed.json';
-                    const dubFeedCacheKey = 'ama-anischedule-dub-feed-ids-v2';
+                    const dubAniScheduleUrl = 'https://raw.githubusercontent.com/Bas1874/AniSchedule/refs/heads/master/raw/dub-episode-feed.json';
+                    const dubMappingUrl = 'https://raw.githubusercontent.com/Joelis57/MyDubList/refs/heads/main/dubs/mappings/mappings_anilist.jsonl';
+                    const dubEnglishSourceUrls = [
+                        'https://raw.githubusercontent.com/Joelis57/MyDubList/refs/heads/main/dubs/confidence/very-high/dubbed_english.json',
+                        'https://raw.githubusercontent.com/Joelis57/MyDubList/refs/heads/main/dubs/confidence/high/dubbed_english.json'
+                    ];
+                    const dubFeedCacheKey = 'ama-hybrid-dub-anilist-ids-v1';
                     const dubFeedCacheTTL = 1000 * 60 * 60 * 12;
+                    const animeScheduleApiBaseUrl = 'https://animeschedule.net/api/v3';
+                    const asunaTracksScheduleApiBaseUrl = 'https://asunatracks.space/public/api';
+                    const animeScheduleApiTokenKey = 'ama-ui-tweaks.animeScheduleApiToken';
 
                     const defaultSettings = {
                         betterMarketplace: true,
@@ -1336,9 +1812,15 @@ function init() {
                         } catch (_) {}
                     }
 
+                    function clearAnimeScheduleApiTokenSetting() {
+                        try {
+                            window.localStorage.removeItem(animeScheduleApiTokenKey);
+                        } catch (_) {}
+                    }
+
                     function normalizeFeatureSettings(settings) {
                         const next = Object.assign({}, defaultSettings, settings || {});
-
+                        delete next.animeScheduleApiToken;
                         return next;
                     }
 
@@ -1348,6 +1830,7 @@ function init() {
                         ${JSON.stringify(initialFeatureSettings)},
                         readBrowserSettings()
                     ));
+                    clearAnimeScheduleApiTokenSetting();
 
                     const CC_ICON =
                         '<svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">' +
@@ -1368,6 +1851,10 @@ function init() {
                     const SETTINGS_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>';
 
                     let dubIdSetPromise = null;
+                    let malToAnilistMapPromise = null;
+                    let animeScheduleDubApiEntriesPromises = new Map();
+                    let animeScheduleDubFeedEntriesPromise = null;
+                    const animeScheduleAnimeDetailsPromises = new Map();
                     const dragScrollEnhancementVersion = 'v8';
                     const marketplaceEnhancementVersion = 'v11';
                     const catalogActionSources = new Map();
@@ -1556,6 +2043,102 @@ function init() {
                         return ids;
                     }
 
+                    function splitTextLines(text) {
+                        return String(text || '').split(String.fromCharCode(13)).join('').split(String.fromCharCode(10));
+                    }
+
+                    function collectIdsFromJsonValue(value, ids, depth) {
+                        if (value === null || value === undefined || depth > 8) return;
+
+                        if (typeof value === 'string' || typeof value === 'number') {
+                            addId(ids, value);
+                            return;
+                        }
+
+                        if (Array.isArray(value)) {
+                            value.forEach(item => collectIdsFromJsonValue(item, ids, depth + 1));
+                            return;
+                        }
+
+                        if (typeof value !== 'object') return;
+
+                        Object.keys(value).forEach(key => {
+                            const normalizedKey = String(key || '').replace(/[-_\\s]/g, '').toLowerCase();
+                            const child = value[key];
+
+                            if (/^\\d+$/.test(String(key)) && child) {
+                                addId(ids, key);
+                                return;
+                            }
+
+                            if (
+                                normalizedKey === 'id' ||
+                                normalizedKey === 'mal' ||
+                                normalizedKey === 'malid' ||
+                                normalizedKey === 'myanimelistid' ||
+                                normalizedKey === 'animeid'
+                            ) {
+                                addId(ids, child);
+                                return;
+                            }
+
+                            collectIdsFromJsonValue(child, ids, depth + 1);
+                        });
+                    }
+
+                    function extractDubMalIdsFromJsonText(text) {
+                        const ids = new Set();
+                        if (!text) return ids;
+
+                        try {
+                            collectIdsFromJsonValue(JSON.parse(String(text)), ids, 0);
+                            return ids;
+                        } catch (_) {}
+
+                        splitTextLines(text).forEach(line => {
+                            let cleaned = String(line || '').trim();
+                            ['[', ']', ',', '"', "'"].forEach(ch => {
+                                cleaned = cleaned.split(ch).join('');
+                            });
+
+                            if (/^\\d+$/.test(cleaned)) addId(ids, cleaned);
+                        });
+
+                        return ids;
+                    }
+
+                    function extractMalToAnilistMapFromJsonl(text) {
+                        const map = new Map();
+                        if (!text) return map;
+
+                        splitTextLines(text).forEach(line => {
+                            const trimmed = String(line || '').trim();
+                            if (!trimmed || trimmed[0] !== '{') return;
+
+                            try {
+                                const item = JSON.parse(trimmed);
+                                if (!item || typeof item !== 'object') return;
+
+                                const malId = normalizeId(item.mal_id || item.malId || item.malID || item.myAnimeListId || item.idMal);
+                                const anilistId = normalizeId(item.anilist_id || item.anilistId || item.anilistID || item.aniListId || item.idAniList);
+
+                                if (malId && anilistId) map.set(malId, anilistId);
+                            } catch (_) {}
+                        });
+
+                        return map;
+                    }
+
+                    function loadMalToAnilistMap() {
+                        if (malToAnilistMapPromise) return malToAnilistMapPromise;
+
+                        malToAnilistMapPromise = fetchTextWithTimeout(dubMappingUrl, 25000)
+                            .then(text => extractMalToAnilistMapFromJsonl(text))
+                            .catch(() => new Map());
+
+                        return malToAnilistMapPromise;
+                    }
+
                     function getCachedDubIds() {
                         try {
                             const raw = window.localStorage.getItem(dubFeedCacheKey);
@@ -1575,6 +2158,11 @@ function init() {
 
                     function setCachedDubIds(ids) {
                         try {
+                            if (!ids || ids.size === 0) {
+                                window.localStorage.removeItem(dubFeedCacheKey);
+                                return;
+                            }
+
                             window.localStorage.setItem(dubFeedCacheKey, JSON.stringify({
                                 time: Date.now(),
                                 ids: Array.from(ids)
@@ -1622,6 +2210,832 @@ function init() {
                         }
                     }
 
+                    function getAsunaTracksScheduleUrlFromEndpoint(endpoint) {
+                        try {
+                            if (!String(endpoint || '').startsWith('/timetables/dub')) return '';
+
+                            const params = new URLSearchParams(String(endpoint).split('?')[1] || '');
+                            const next = new URLSearchParams();
+                            next.set('type', 'dub');
+
+                            const year = params.get('year');
+                            const week = params.get('week');
+                            const timezone = params.get('tz') || params.get('timezone');
+
+                            if (year) next.set('year', year);
+                            if (week) next.set('week', week);
+                            if (timezone) next.set('tz', timezone);
+
+                            return asunaTracksScheduleApiBaseUrl + '/anime-schedule?' + next.toString();
+                        } catch (_) {
+                            return '';
+                        }
+                    }
+
+                    async function fetchJsonRequestCandidates(candidates, endpoint, timeoutMs) {
+                        let lastStatus = '';
+                        let lastStatusText = '';
+                        let lastMessage = '';
+
+                        for (const candidate of candidates) {
+                            const controller = new AbortController();
+                            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+                            try {
+                                const response = await fetch(candidate.url, {
+                                    signal: controller.signal,
+                                    cache: 'no-store',
+                                    credentials: candidate.credentials || 'include',
+                                    headers: candidate.headers || { Accept: 'application/json' }
+                                });
+                                syncSeanimeIdentity(response);
+
+                                if (!response.ok) {
+                                    lastStatus = 'http-' + response.status;
+                                    lastStatusText = response.statusText || '';
+                                    continue;
+                                }
+
+                                const json = await response.json();
+                                window.__AMA_ANIME_SCHEDULE_API_STATUS__ = {
+                                    endpoint,
+                                    source: candidate.source || 'api',
+                                    status: 'loaded',
+                                    proxied: !!candidate.proxied,
+                                    rows: Array.isArray(json) ? json.length : (json && Array.isArray(json.items) ? json.items.length : (json && typeof json === 'object' ? Object.keys(json).length : 0)),
+                                };
+                                return json;
+                            } catch (error) {
+                                lastStatus = 'failed';
+                                lastMessage = error && error.message ? error.message : String(error || '');
+                            } finally {
+                                clearTimeout(timeout);
+                            }
+                        }
+
+                        window.__AMA_ANIME_SCHEDULE_API_STATUS__ = {
+                            endpoint,
+                            source: candidates[0] && candidates[0].source ? candidates[0].source : 'api',
+                            status: lastStatus || 'failed',
+                            statusText: lastStatusText,
+                            message: lastMessage,
+                            proxied: candidates.some(candidate => candidate.proxied),
+                        };
+
+                        return null;
+                    }
+
+                    async function fetchAnimeScheduleApiJson(endpoint, token, timeoutMs) {
+                        const cleanToken = normalizeAnimeScheduleApiToken(token);
+                        const asunaTracksScheduleUrl = getAsunaTracksScheduleUrlFromEndpoint(endpoint);
+                        window.__AMA_ANIME_SCHEDULE_API_STATUS__ = {
+                            endpoint,
+                            status: 'starting',
+                            source: asunaTracksScheduleUrl ? 'asunatracks' : 'animeschedule',
+                            proxied: !!cleanToken || !!asunaTracksScheduleUrl,
+                        };
+
+                        if (asunaTracksScheduleUrl) {
+                            const headers = {
+                                Accept: 'application/json'
+                            };
+                            const proxiedUrl = '/api/v1/proxy?' + new URLSearchParams({
+                                url: asunaTracksScheduleUrl,
+                                headers: JSON.stringify(headers)
+                            }).toString();
+
+                            return fetchJsonRequestCandidates([
+                                {
+                                    url: asunaTracksScheduleUrl,
+                                    headers,
+                                    credentials: 'omit',
+                                    proxied: false,
+                                    source: 'asunatracks'
+                                },
+                                {
+                                    url: proxiedUrl,
+                                    headers: getSeanimeHeaders({ Accept: 'application/json' }),
+                                    credentials: 'include',
+                                    proxied: true,
+                                    source: 'asunatracks'
+                                }
+                            ], endpoint, timeoutMs);
+                        }
+
+                        const controller = new AbortController();
+                        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+                        try {
+                            const headers = {
+                                Accept: 'application/json'
+                            };
+
+                            let requestUrl = animeScheduleApiBaseUrl + endpoint;
+
+                            if (cleanToken) {
+                                headers.Authorization = 'Bearer ' + cleanToken;
+                                requestUrl = '/api/v1/proxy?' + new URLSearchParams({
+                                    url: requestUrl,
+                                    headers: JSON.stringify(headers)
+                                }).toString();
+                            }
+
+                            const response = await fetch(requestUrl, {
+                                signal: controller.signal,
+                                cache: 'no-store',
+                                credentials: 'include',
+                                headers: cleanToken ? getSeanimeHeaders({ Accept: 'application/json' }) : headers
+                            });
+                            syncSeanimeIdentity(response);
+
+                            if (!response.ok) {
+                                window.__AMA_ANIME_SCHEDULE_API_STATUS__ = {
+                                    endpoint,
+                                    status: 'http-' + response.status,
+                                    statusText: response.statusText || '',
+                                    proxied: !!cleanToken,
+                                };
+                                return null;
+                            }
+
+                            const json = await response.json();
+                            window.__AMA_ANIME_SCHEDULE_API_STATUS__ = {
+                                endpoint,
+                                status: 'loaded',
+                                proxied: !!cleanToken,
+                                rows: Array.isArray(json) ? json.length : (json && typeof json === 'object' ? Object.keys(json).length : 0),
+                            };
+                            return json;
+                        } catch (error) {
+                            window.__AMA_ANIME_SCHEDULE_API_STATUS__ = {
+                                endpoint,
+                                status: 'failed',
+                                message: error && error.message ? error.message : String(error || ''),
+                                proxied: !!cleanToken,
+                            };
+                            return null;
+                        } finally {
+                            clearTimeout(timeout);
+                        }
+                    }
+
+                    function normalizeAnimeScheduleApiToken(value) {
+                        return String(value || '')
+                            .trim()
+                            .replace(/^["']|["']$/g, '')
+                            .replace(/^authorization\s*:\s*/i, '')
+                            .replace(/^bearer\s+/i, '')
+                            .trim();
+                    }
+
+                    function getAnimeScheduleApiToken() {
+                        return '';
+                    }
+
+                    function syncAnimeScheduleApiTokenToDom() {
+                        try {
+                            if (document.body) {
+                                document.body.removeAttribute('data-ama-anime-schedule-api-token');
+                            }
+                        } catch (_) {}
+                    }
+
+                    function normalizeComparableTitle(value) {
+                        return String(value || '')
+                            .toLowerCase()
+                            .replace(/&amp;/g, '&')
+                            .replace(/[^a-z0-9]+/g, ' ')
+                            .trim()
+                            .replace(/\\s+/g, ' ');
+                    }
+
+                    function normalizeEpisodeNumber(value) {
+                        const text = String(value === null || value === undefined ? '' : value).trim();
+                        if (!text) return '';
+
+                        const numeric = Number(text);
+                        if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
+                            return String(numeric).replace(/\\.0$/, '');
+                        }
+
+                        return text;
+                    }
+
+                    function getIsoWeekInfo(date) {
+                        const source = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+                        const utc = new Date(Date.UTC(source.getFullYear(), source.getMonth(), source.getDate()));
+                        const day = utc.getUTCDay() || 7;
+                        utc.setUTCDate(utc.getUTCDate() + 4 - day);
+                        const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+                        const week = Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+
+                        return {
+                            year: utc.getUTCFullYear(),
+                            week
+                        };
+                    }
+
+                    function parseAnimeScheduleDate(value) {
+                        const text = String(value || '').trim();
+                        if (!text || text.indexOf('0001-01-01') === 0) return null;
+
+                        const date = new Date(text);
+                        return date && !Number.isNaN(date.getTime()) ? date : null;
+                    }
+
+                    function getWholeWeeksBetween(startDate, endDate) {
+                        if (!(startDate instanceof Date) || !(endDate instanceof Date)) return -1;
+                        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return -1;
+
+                        const diff = endDate.getTime() - startDate.getTime();
+                        if (diff < 0) return -1;
+
+                        return Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+                    }
+
+                    function flattenObjects(value, result, depth) {
+                        if (!value || depth > 8) return;
+
+                        if (Array.isArray(value)) {
+                            value.forEach(item => flattenObjects(item, result, depth + 1));
+                            return;
+                        }
+
+                        if (typeof value !== 'object') return;
+
+                        result.push(value);
+
+                        Object.keys(value).forEach(key => {
+                            const child = value[key];
+                            if (child && typeof child === 'object') flattenObjects(child, result, depth + 1);
+                        });
+                    }
+
+                    function getAnimeScheduleEntryTitleCandidates(entry) {
+                        if (!entry || typeof entry !== 'object') return [];
+
+                        const names = entry.names || entry.name || {};
+                        const candidates = [
+                            entry.title,
+                            entry.name,
+                            entry.animeTitle,
+                            entry.anime_title,
+                            entry.mediaTitle,
+                            entry.media_title,
+                            entry.english,
+                            entry.romaji,
+                            entry.native,
+                            entry.title_english,
+                            entry.title_romaji,
+                            entry.title_native,
+                            entry.media && entry.media.title_english,
+                            entry.media && entry.media.title,
+                            entry.media && entry.media.name,
+                            names.title,
+                            names.english,
+                            names.romaji,
+                            names.native,
+                            Array.isArray(names.synonyms) ? names.synonyms[0] : '',
+                            entry.route
+                        ];
+
+                        return candidates.map(value => {
+                            if (value && typeof value === 'object') {
+                                return String(value.english || value.romaji || value.native || value.title || value.name || '').trim();
+                            }
+
+                            return String(value || '').trim();
+                        }).filter(Boolean);
+                    }
+
+                    function getAnimeScheduleEntryTitle(entry) {
+                        const candidates = getAnimeScheduleEntryTitleCandidates(entry);
+
+                        return candidates[0] || '';
+                    }
+
+                    function animeScheduleTitlesMatch(entry, title) {
+                        const scheduleTitle = normalizeComparableTitle(title);
+                        if (!scheduleTitle) return false;
+
+                        const entryTitles = getAnimeScheduleEntryTitleCandidates(entry)
+                            .map(normalizeComparableTitle)
+                            .filter(Boolean);
+
+                        if (entryTitles.some(entryTitle => entryTitle === scheduleTitle)) return true;
+
+                        const scheduleWords = new Set(scheduleTitle.split(' ').filter(word => word.length > 2));
+                        if (scheduleWords.size >= 3) {
+                            const hasStrongWordMatch = entryTitles.some(entryTitle => {
+                                const entryWords = entryTitle.split(' ').filter(word => word.length > 2);
+                                if (entryWords.length < 3) return false;
+
+                                let shared = 0;
+                                entryWords.forEach(word => {
+                                    if (scheduleWords.has(word)) shared += 1;
+                                });
+
+                                return shared >= Math.min(4, Math.ceil(Math.min(scheduleWords.size, entryWords.length) * 0.75));
+                            });
+
+                            if (hasStrongWordMatch) return true;
+                        }
+
+                        return entryTitles.some(entryTitle => {
+                            if (entryTitle.length < 18 || scheduleTitle.length < 18) return false;
+
+                            const longer = entryTitle.length >= scheduleTitle.length ? entryTitle : scheduleTitle;
+                            const shorter = entryTitle.length < scheduleTitle.length ? entryTitle : scheduleTitle;
+                            if (shorter.length / longer.length < 0.85) return false;
+
+                            return longer.includes(shorter);
+                        });
+                    }
+
+                    function getAnimeScheduleEntryAnilistId(entry) {
+                        if (!entry || typeof entry !== 'object') return '';
+
+                        const mapped = normalizeId(entry.__amaAnilistId || entry.amaAnilistId);
+                        if (mapped) return mapped;
+
+                        const numericId = normalizeId(entry.id);
+                        if (numericId && (entry.idMal || entry.episode || entry.format || entry.duration)) return numericId;
+
+                        const direct = normalizeId(
+                            entry.anilistId ||
+                            entry.anilistID ||
+                            entry.aniListId ||
+                            entry.anilist_id ||
+                            entry.ani_list_id ||
+                            (entry.external_ids && (entry.external_ids.anilist || entry.external_ids.aniList || entry.external_ids.anilist_id)) ||
+                            (entry.externalIds && (entry.externalIds.anilist || entry.externalIds.aniList || entry.externalIds.anilist_id)) ||
+                            (entry.media && entry.media.external_ids && (entry.media.external_ids.anilist || entry.media.external_ids.aniList || entry.media.external_ids.anilist_id)) ||
+                            (entry.media && entry.media.externalIds && (entry.media.externalIds.anilist || entry.media.externalIds.aniList || entry.media.externalIds.anilist_id)) ||
+                            entry.mediaId ||
+                            entry.media_id ||
+                            entry.idAniList ||
+                            entry.id_anilist
+                        );
+
+                        if (direct) return direct;
+
+                        const websites = entry.websites || entry.website || {};
+                        const websiteValue = websites.aniList || websites.anilist || websites.ani_list || entry.aniList || entry.anilist || '';
+                        const websiteId = normalizeId(websiteValue) || getAnilistIdFromHref(websiteValue);
+
+                        if (websiteId) return websiteId;
+
+                        return readAnilistIdFromObject(entry, 0, new WeakSet(), false);
+                    }
+
+                    function getAnimeScheduleEntryMalId(entry) {
+                        if (!entry || typeof entry !== 'object') return '';
+
+                        return normalizeId(
+                            entry.mal_id ||
+                            entry.malId ||
+                            entry.malID ||
+                            entry.myAnimeListId ||
+                            entry.idMal ||
+                            (entry.media && (entry.media.mal_id || entry.media.malId || entry.media.malID || entry.media.myAnimeListId || entry.media.idMal))
+                        );
+                    }
+
+                    function getAsunaTracksScheduleEntryAnilistId(entry) {
+                        if (!entry || typeof entry !== 'object') return '';
+
+                        return normalizeId(
+                            entry.__amaAnilistId ||
+                            entry.amaAnilistId ||
+                            (entry.external_ids && (entry.external_ids.anilist || entry.external_ids.aniList || entry.external_ids.anilist_id)) ||
+                            (entry.externalIds && (entry.externalIds.anilist || entry.externalIds.aniList || entry.externalIds.anilist_id)) ||
+                            (entry.media && entry.media.external_ids && (entry.media.external_ids.anilist || entry.media.external_ids.aniList || entry.media.external_ids.anilist_id)) ||
+                            (entry.media && entry.media.externalIds && (entry.media.externalIds.anilist || entry.media.externalIds.aniList || entry.media.externalIds.anilist_id))
+                        );
+                    }
+
+                    function getEpisodeNumberFromValue(value) {
+                        const text = String(value === null || value === undefined ? '' : value).trim();
+                        if (!text) return '';
+
+                        const direct = text.match(/^\\d+(?:\\.\\d+)?$/);
+                        if (direct) return normalizeEpisodeNumber(direct[0]);
+
+                        const patterns = [
+                            /(?:episode|ep\\.?|e)\\s*#?\\s*(\\d+(?:\\.\\d+)?)/i,
+                            /#\\s*(\\d+(?:\\.\\d+)?)/,
+                            /\\b(\\d+(?:\\.\\d+)?)\\s*(?:sub|dub|raw)?\\s*(?:aired|airing|episode|ep)\\b/i
+                        ];
+
+                        for (const pattern of patterns) {
+                            const match = text.match(pattern);
+                            if (match && match[1]) return normalizeEpisodeNumber(match[1]);
+                        }
+
+                        return '';
+                    }
+
+                    function getAnimeScheduleEntryEpisodeNumber(entry) {
+                        if (!entry || typeof entry !== 'object') return '';
+
+                        const values = [
+                            entry.episodeNumber,
+                            entry.episode_number,
+                            entry.episode,
+                            entry.episodeNum,
+                            entry.episode_num,
+                            entry.episode_no,
+                            entry.number,
+                            entry.dubEpisode,
+                            entry.dub_episode,
+                            entry.dubEpisodeNumber,
+                            entry.dub_episode_number,
+                            entry.latestDubEpisode,
+                            entry.latest_dub_episode,
+                            entry.latestDubEpisodeNumber,
+                            entry.latest_dub_episode_number,
+                            entry.lastDubEpisode,
+                            entry.last_dub_episode,
+                            entry.lastDubEpisodeNumber,
+                            entry.last_dub_episode_number,
+                            entry.dub,
+                            entry.dubbedEpisode,
+                            entry.dubbed_episode,
+                            entry.dubbedEpisodeNumber,
+                            entry.dubbed_episode_number,
+                            entry.currentEpisode,
+                            entry.current_episode,
+                            entry.airingEpisode,
+                            entry.airing_episode,
+                            entry.episode && entry.episode.aired,
+                            entry.episode && entry.episode.number,
+                            entry.episode && entry.episode.episodeNumber,
+                            entry.episode && entry.episode.episode_number
+                        ];
+
+                        for (const value of values) {
+                            const episode = getEpisodeNumberFromValue(value);
+                            if (episode) return episode;
+                        }
+
+                        return '';
+                    }
+
+                    function isAnimeScheduleDubEntry(entry) {
+                        if (!entry || typeof entry !== 'object') return true;
+
+                        const airType = String(entry.airType || entry.air_type || entry.type || entry.releaseType || entry.release_type || entry.subOrDub || entry.sub_or_dub || entry.audio || '').toLowerCase();
+                        if (airType) return airType.includes('dub');
+
+                        const text = String(entry.title || entry.name || entry.label || '').toLowerCase();
+                        return !text || text.includes('dub');
+                    }
+
+                    function getScheduleEpisodeNumber(event) {
+                        if (!event) return '';
+
+                        const attrNames = [
+                            'data-episode-number',
+                            'data-schedule-episode-number',
+                            'data-schedule-calendar-event-item-episode-number',
+                            'data-episode',
+                            'data-ep'
+                        ];
+
+                        const attrEpisode = getEpisodeNumberFromValue(getAttributeAnyCase(event, attrNames));
+                        if (attrEpisode) return attrEpisode;
+
+                        const data = event.dataset || {};
+                        const datasetNames = ['episodeNumber', 'scheduleEpisodeNumber', 'scheduleCalendarEventItemEpisodeNumber', 'episode', 'ep'];
+
+                        for (const name of datasetNames) {
+                            const episode = getEpisodeNumberFromValue(data[name]);
+                            if (episode) return episode;
+                        }
+
+                        const textTargets = [event];
+                        if (event.querySelectorAll) {
+                            event.querySelectorAll('[data-schedule-calendar-event-item-episode], [data-schedule-calendar-event-item-episode-time], [data-schedule-calendar-mobile-list-day-item-event-episode], [data-schedule-calendar-mobile-list-day-item-event-episode-time], [data-schedule-event-episode], [data-episode-number], [data-episode], span, p, div').forEach(el => {
+                                if (textTargets.length < 80) textTargets.push(el);
+                            });
+                        }
+
+                        for (const target of textTargets) {
+                            const episode = getEpisodeNumberFromValue(target.textContent || '');
+                            if (episode) return episode;
+                        }
+
+                        return '';
+                    }
+
+                    function getScheduleDate(event) {
+                        if (!event) return null;
+
+                        const time = event.querySelector && event.querySelector('time[datetime], [datetime]');
+                        const datetime = time && time.getAttribute ? time.getAttribute('datetime') : '';
+                        const date = datetime ? new Date(datetime) : null;
+
+                        if (date && !Number.isNaN(date.getTime())) return date;
+
+                        const datedParent = event.closest && event.closest('[datetime], [data-date], [data-day], [data-schedule-date], [data-schedule-day], [data-calendar-date]');
+                        if (datedParent && datedParent.getAttribute) {
+                            const attrDate = getAttributeAnyCase(datedParent, ['datetime', 'data-date', 'data-day', 'data-schedule-date', 'data-schedule-day', 'data-calendar-date']);
+                            const parentDate = parseAnimeScheduleDate(attrDate);
+                            if (parentDate) return parentDate;
+                        }
+
+                        return null;
+                    }
+
+                    function getScheduleTitle(event) {
+                        if (!event) return '';
+
+                        const titleTarget = event.querySelector && event.querySelector('[data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-title], [data-schedule-calendar-mobile-list-day-item-event-text], [data-schedule-calendar-mobile-list-day-item-event-image], [data-schedule-event-title], [data-media-title], [title], a[href]');
+                        const candidates = [
+                            titleTarget && titleTarget.getAttribute && titleTarget.getAttribute('title'),
+                            titleTarget && titleTarget.getAttribute && titleTarget.getAttribute('alt'),
+                            titleTarget && titleTarget.textContent,
+                            event.getAttribute && event.getAttribute('title'),
+                            event.textContent
+                        ];
+
+                        return candidates.map(value => String(value || '').trim()).find(Boolean) || '';
+                    }
+
+                    function datesAreSameLocalDay(a, b) {
+                        if (!(a instanceof Date) || !(b instanceof Date)) return false;
+                        if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+
+                        return a.getFullYear() === b.getFullYear() &&
+                            a.getMonth() === b.getMonth() &&
+                            a.getDate() === b.getDate();
+                    }
+
+                    function canUseScheduleFallback(scheduleDate) {
+                        if (!(scheduleDate instanceof Date) || Number.isNaN(scheduleDate.getTime())) return false;
+
+                        const currentWeekStart = new Date();
+                        currentWeekStart.setHours(0, 0, 0, 0);
+                        const dayOffset = (currentWeekStart.getDay() + 6) % 7;
+                        currentWeekStart.setDate(currentWeekStart.getDate() - dayOffset);
+
+                        const scheduleDay = new Date(scheduleDate.getTime());
+                        scheduleDay.setHours(0, 0, 0, 0);
+
+                        return scheduleDay.getTime() < currentWeekStart.getTime();
+                    }
+
+                    function getAnimeScheduleEntryDate(entry) {
+                        if (!entry || typeof entry !== 'object') return null;
+
+                        return parseAnimeScheduleDate(
+                            entry.episodeDate ||
+                            entry.episode_date ||
+                            entry.date ||
+                            entry.datetime ||
+                            entry.airingAt ||
+                            entry.airing_at ||
+                            entry.airedAt ||
+                            entry.aired_at ||
+                            entry.releaseTime ||
+                            entry.release_time ||
+                            entry.startsAt ||
+                            entry.starts_at ||
+                            entry.startTime ||
+                            entry.start_time ||
+                            (entry.episode && (entry.episode.airedAt || entry.episode.aired_at || entry.episode.date || entry.episode.datetime || entry.episode.episode_date))
+                        );
+                    }
+
+                    function animeScheduleEntryMatchesSchedule(entry, anilistId, title, episodeNumber, scheduleDate) {
+                        if (!entry) return false;
+                        if (!isAnimeScheduleDubEntry(entry)) return false;
+
+                        const entryEpisode = getAnimeScheduleEntryEpisodeNumber(entry);
+                        if (!entryEpisode) return false;
+
+                        const entryDate = getAnimeScheduleEntryDate(entry);
+                        if (entryDate && scheduleDate && !datesAreSameLocalDay(entryDate, scheduleDate)) return false;
+
+                        const entryAnilistId = getAnimeScheduleEntryAnilistId(entry);
+                        if (anilistId && entryAnilistId && String(entryAnilistId) === String(anilistId)) return true;
+
+                        return animeScheduleTitlesMatch(entry, title);
+                    }
+
+                    function asunaTracksScheduleEntryMatchesSchedule(entry, anilistId, title, scheduleDate) {
+                        if (!entry || typeof entry !== 'object') return false;
+                        if (!isAnimeScheduleDubEntry(entry)) return false;
+                        if (!getAnimeScheduleEntryEpisodeNumber(entry)) return false;
+
+                        const entryAnilistId = getAsunaTracksScheduleEntryAnilistId(entry);
+                        if (anilistId && entryAnilistId && String(entryAnilistId) === String(anilistId)) return true;
+
+                        const entryDate = getAnimeScheduleEntryDate(entry);
+                        if (entryDate && scheduleDate && !datesAreSameLocalDay(entryDate, scheduleDate)) return false;
+
+                        return animeScheduleTitlesMatch(entry, title);
+                    }
+
+                    function animeScheduleEntryMatchesAnime(entry, anilistId, title) {
+                        if (!entry) return false;
+                        if (!isAnimeScheduleDubEntry(entry)) return false;
+
+                        const entryAnilistId = getAnimeScheduleEntryAnilistId(entry);
+                        if (anilistId && entryAnilistId && String(entryAnilistId) === String(anilistId)) return true;
+
+                        return animeScheduleTitlesMatch(entry, title);
+                    }
+
+                    function getBestDubEntryForAnime(entries, anilistId, title) {
+                        if (!Array.isArray(entries)) return null;
+
+                        const matches = entries.filter(entry => animeScheduleEntryMatchesAnime(entry, anilistId, title));
+                        if (!matches.length) return null;
+
+                        matches.sort((a, b) => {
+                            const aEpisode = Number(getAnimeScheduleEntryEpisodeNumber(a) || 0);
+                            const bEpisode = Number(getAnimeScheduleEntryEpisodeNumber(b) || 0);
+
+                            return bEpisode - aEpisode;
+                        });
+
+                        return matches[0] || null;
+                    }
+
+                    function getScheduleDubMatchDetails(entry, source) {
+                        if (!entry) return null;
+
+                        const episodeNumber = getAnimeScheduleEntryEpisodeNumber(entry);
+                        const title = getAnimeScheduleEntryTitle(entry);
+                        const episodeDate = entry.episodeDate || entry.episode_date || entry.date || entry.datetime || entry.airingAt || entry.airing_at || entry.airedAt || entry.aired_at || (entry.episode && (entry.episode.airedAt || entry.episode.aired_at || entry.episode.date || entry.episode.datetime || entry.episode.episode_date)) || '';
+
+                        return {
+                            source,
+                            episodeNumber,
+                            title,
+                            episodeDate,
+                            exact: source === 'api' || source === 'fallback'
+                        };
+                    }
+
+                    function getAnimeScheduleAnimeItems(data) {
+                        if (!data) return [];
+
+                        if (Array.isArray(data)) return data;
+                        if (Array.isArray(data.anime)) return data.anime;
+                        if (Array.isArray(data.items)) return data.items;
+                        if (Array.isArray(data.results)) return data.results;
+                        if (Array.isArray(data.data)) return data.data;
+
+                        return [data];
+                    }
+
+                    function loadAnimeScheduleAnimeByAnilistId(anilistId) {
+                        const token = getAnimeScheduleApiToken();
+                        const id = normalizeId(anilistId);
+                        if (!id) return Promise.resolve(null);
+
+                        if (animeScheduleAnimeDetailsPromises.has(id)) return animeScheduleAnimeDetailsPromises.get(id);
+
+                        const promise = fetchAnimeScheduleApiJson('/anime?anilist-ids=' + encodeURIComponent(id), token, 9000).then(data => {
+                            const items = getAnimeScheduleAnimeItems(data);
+                            return items.find(item => {
+                                return item && String(getAnimeScheduleEntryAnilistId(item)) === String(id);
+                            }) || items[0] || null;
+                        }).catch(() => null);
+
+                        animeScheduleAnimeDetailsPromises.set(id, promise);
+
+                        return promise;
+                    }
+
+                    function getDubDetailsFromAnimeScheduleAnime(anime, scheduleDate, title) {
+                        if (!anime || typeof anime !== 'object') return null;
+
+                        const dubPremier = parseAnimeScheduleDate(anime.dubPremier || anime.dubPremierDate || anime.dubStartDate);
+                        if (!dubPremier) return null;
+
+                        const targetDate = scheduleDate instanceof Date && !Number.isNaN(scheduleDate.getTime()) ? scheduleDate : new Date();
+                        const weeks = getWholeWeeksBetween(dubPremier, targetDate);
+                        if (weeks < 0) return null;
+
+                        const episodeNumber = String(weeks + 1);
+                        const totalEpisodes = Number(anime.episodes || 0);
+                        if (totalEpisodes && Number(episodeNumber) > totalEpisodes) return null;
+
+                        return {
+                            source: 'anime-api',
+                            episodeNumber,
+                            title: getAnimeScheduleEntryTitle(anime) || title,
+                            episodeDate: dubPremier.toISOString(),
+                            exact: false
+                        };
+                    }
+
+                    function normalizeAnimeScheduleEntries(data) {
+                        const objects = [];
+                        flattenObjects(data, objects, 0);
+
+                        return objects.filter(entry => {
+                            return getAnimeScheduleEntryEpisodeNumber(entry) && (getAnimeScheduleEntryAnilistId(entry) || getAnimeScheduleEntryTitle(entry));
+                        });
+                    }
+
+                    function annotateAnimeScheduleEntriesWithAnilistIds(entries, malToAnilist) {
+                        if (!Array.isArray(entries) || !malToAnilist || !malToAnilist.size) return entries;
+
+                        entries.forEach(entry => {
+                            if (!entry || typeof entry !== 'object' || getAsunaTracksScheduleEntryAnilistId(entry)) return;
+
+                            const malId = getAnimeScheduleEntryMalId(entry);
+                            const anilistId = malId ? malToAnilist.get(malId) : '';
+                            if (anilistId) entry.__amaAnilistId = anilistId;
+                        });
+
+                        return entries;
+                    }
+
+                    async function loadAnimeScheduleApiDubEntries(scheduleDate) {
+                        const token = getAnimeScheduleApiToken();
+
+                        const timezone = (() => {
+                            try {
+                                return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Oslo';
+                            } catch (_) {
+                                return 'Europe/Oslo';
+                            }
+                        })();
+                        const weekInfo = getIsoWeekInfo(scheduleDate);
+                        const cacheKey = weekInfo.year + '-w' + weekInfo.week + '-' + timezone + '-' + (token ? 'token' : 'public');
+
+                        if (animeScheduleDubApiEntriesPromises.has(cacheKey)) return animeScheduleDubApiEntriesPromises.get(cacheKey);
+
+                        const promise = (async () => {
+                            const data = await fetchAnimeScheduleApiJson('/timetables/dub?year=' + encodeURIComponent(weekInfo.year) + '&week=' + encodeURIComponent(weekInfo.week) + '&tz=' + encodeURIComponent(timezone), token, 25000);
+                            if (!data) return null;
+
+                            const entries = normalizeAnimeScheduleEntries(data);
+                            const malToAnilist = await loadMalToAnilistMap();
+
+                            return annotateAnimeScheduleEntriesWithAnilistIds(entries, malToAnilist);
+                        })();
+
+                        animeScheduleDubApiEntriesPromises.set(cacheKey, promise);
+
+                        return promise;
+                    }
+
+                    async function loadAnimeScheduleApiDubEntriesNear(scheduleDate) {
+                        if (scheduleDate instanceof Date && !Number.isNaN(scheduleDate.getTime())) {
+                            return loadAnimeScheduleApiDubEntries(scheduleDate);
+                        }
+
+                        const base = new Date();
+                        const dates = [-7, 0, 7, 14].map(offsetDays => {
+                            const date = new Date(base.getTime());
+                            date.setDate(date.getDate() + offsetDays);
+                            return date;
+                        });
+
+                        const groups = await Promise.all(dates.map(date => loadAnimeScheduleApiDubEntries(date).catch(() => null)));
+                        const merged = [];
+                        const seen = new Set();
+
+                        groups.forEach(entries => {
+                            if (!Array.isArray(entries)) return;
+
+                            entries.forEach(entry => {
+                                const key = [
+                                    getAnimeScheduleEntryTitle(entry),
+                                    getAnimeScheduleEntryEpisodeNumber(entry),
+                                    getAnimeScheduleEntryDate(entry) ? getAnimeScheduleEntryDate(entry).toISOString() : '',
+                                    getAnimeScheduleEntryMalId(entry),
+                                    getAnimeScheduleEntryAnilistId(entry)
+                                ].join('|');
+
+                                if (seen.has(key)) return;
+                                seen.add(key);
+                                merged.push(entry);
+                            });
+                        });
+
+                        return merged.length ? merged : null;
+                    }
+
+                    function loadAnimeScheduleFeedDubEntries() {
+                        if (animeScheduleDubFeedEntriesPromise) return animeScheduleDubFeedEntriesPromise;
+
+                        animeScheduleDubFeedEntriesPromise = (async () => {
+                            const data = await fetchJsonWithTimeout(dubAniScheduleUrl, 7000);
+                            if (!data) return [];
+
+                            return normalizeAnimeScheduleEntries(data);
+                        })();
+
+                        return animeScheduleDubFeedEntriesPromise;
+                    }
+
                     function loadDubIds() {
                         if (dubIdSetPromise) return dubIdSetPromise;
 
@@ -1629,8 +3043,26 @@ function init() {
                             const cached = getCachedDubIds();
                             if (cached) return cached;
 
-                            const data = await fetchJsonWithTimeout(dubFeedUrl, 7000);
-                            const ids = extractDubIdsFromData(data);
+                            const ids = new Set();
+
+                            const malToAnilist = await loadMalToAnilistMap();
+
+                            if (malToAnilist && malToAnilist.size) {
+                                const dubTexts = await Promise.all(
+                                    dubEnglishSourceUrls.map(url => fetchTextWithTimeout(url, 9000))
+                                );
+
+                                dubTexts.forEach(text => {
+                                    const malIds = extractDubMalIdsFromJsonText(text);
+                                    malIds.forEach(malId => {
+                                        const anilistId = malToAnilist.get(malId);
+                                        if (anilistId) ids.add(anilistId);
+                                    });
+                                });
+                            }
+
+                            const aniScheduleData = await fetchJsonWithTimeout(dubAniScheduleUrl, 7000);
+                            extractDubIdsFromData(aniScheduleData).forEach(id => ids.add(id));
 
                             setCachedDubIds(ids);
 
@@ -1640,16 +3072,354 @@ function init() {
                         return dubIdSetPromise;
                     }
 
+                    window.__AMA_DUB_CLEAR_CACHE__ = function() {
+                        try {
+                            window.localStorage.removeItem(dubFeedCacheKey);
+                        } catch (_) {}
+
+                        dubIdSetPromise = null;
+                        animeScheduleDubApiEntriesPromises = new Map();
+                        animeScheduleDubFeedEntriesPromise = null;
+                        animeScheduleAnimeDetailsPromises.clear();
+                        malToAnilistMapPromise = null;
+                    };
+
+                    window.__AMA_DUB_RESCAN_SCHEDULE__ = function() {
+                        try {
+                            document.querySelectorAll('[data-ama-schedule-dub-enhanced]').forEach(event => {
+                                delete event.dataset.amaScheduleDubEnhanced;
+                            });
+                            scheduleRoot(document.body || document.documentElement);
+                        } catch (_) {}
+                    };
+
+                    function getAttributeAnyCase(element, names) {
+                        if (!element || !element.getAttribute) return '';
+
+                        for (const name of names) {
+                            const value = element.getAttribute(name);
+                            if (value) return value;
+                        }
+
+                        const attributes = element.attributes ? Array.from(element.attributes) : [];
+                        const lowerNames = names.map(name => String(name).toLowerCase());
+
+                        for (const attr of attributes) {
+                            if (lowerNames.includes(String(attr.name || '').toLowerCase())) return attr.value;
+                        }
+
+                        return '';
+                    }
+
+                    function getStrictIdFromElement(element, allowGenericId) {
+                        if (!element) return '';
+
+                        const attributeNames = [
+                            'data-media-id',
+                            'data-anilist-id',
+                            'data-anilistid',
+                            'data-ani-list-id',
+                            'data-anilist-media-id',
+                            'data-media-anilist-id',
+                            'data-entry-anilist-id',
+                            'data-entry-media-id',
+                            'data-anime-id',
+                            'data-media-entry-id',
+                            'data-mediaentryid',
+                            'data-entry-id',
+                            'data-schedule-media-id'
+                        ];
+
+                        if (allowGenericId) attributeNames.push('data-id');
+
+                        const attrId = normalizeId(getAttributeAnyCase(element, attributeNames));
+                        if (attrId) return attrId;
+
+                        const data = element.dataset || {};
+                        const datasetNames = [
+                            'amaDubAnilistId',
+                            'mediaId',
+                            'anilistId',
+                            'anilistid',
+                            'aniListId',
+                            'anilistMediaId',
+                            'mediaAnilistId',
+                            'entryAnilistId',
+                            'entryMediaId',
+                            'animeId',
+                            'mediaEntryId',
+                            'entryId',
+                            'scheduleMediaId'
+                        ];
+
+                        if (allowGenericId) datasetNames.push('id');
+
+                        for (const name of datasetNames) {
+                            const id = normalizeId(data[name]);
+                            if (id) return id;
+                        }
+
+                        return '';
+                    }
+
+                    function getAnilistIdFromHref(href) {
+                        if (!href) return '';
+
+                        let pathAndQuery = String(href || '');
+
+                        try {
+                            const parsed = new URL(pathAndQuery, window.location.origin);
+                            pathAndQuery = (parsed.pathname || '') + (parsed.search || '') + (parsed.hash || '');
+
+                            const paramNames = ['anilistId', 'anilist_id', 'aniListId', 'mediaId', 'media_id', 'animeId', 'anime_id', 'id'];
+                            for (const name of paramNames) {
+                                const id = normalizeId(parsed.searchParams.get(name));
+                                if (id) return id;
+                            }
+                        } catch (_) {}
+
+                        const patterns = [
+                            /(?:^|\\/)anime\\/([0-9]+)(?:[\\/\\?#]|$)/i,
+                            /(?:^|\\/)anime\\/details\\/([0-9]+)(?:[\\/\\?#]|$)/i,
+                            /(?:^|\\/)media\\/(?:anime\\/)?([0-9]+)(?:[\\/\\?#]|$)/i,
+                            /(?:^|\\/)entry\\/(?:anime\\/)?([0-9]+)(?:[\\/\\?#]|$)/i,
+                            /(?:^|\\/)details\\/(?:anime\\/)?([0-9]+)(?:[\\/\\?#]|$)/i,
+                            /[?&#](?:anilistId|anilist_id|aniListId|mediaId|media_id|animeId|anime_id)=([0-9]+)(?:&|#|$)/i
+                        ];
+
+                        for (const pattern of patterns) {
+                            const match = pathAndQuery.match(pattern);
+                            if (match && match[1]) return match[1];
+                        }
+
+                        return '';
+                    }
+
+                    function objectLooksLikeAniListMediaObject(value) {
+                        if (!value || typeof value !== 'object') return false;
+
+                        const mediaType = String(value.type || value.mediaType || value.kind || value.format || value.__typename || '').toLowerCase();
+                        if (mediaType.includes('anime')) return true;
+                        if (mediaType === 'media' || mediaType === 'baseanime') return true;
+
+                        return !!(value.title || value.coverImage || value.bannerImage || value.season || value.seasonYear || value.episodes || value.nextAiringEpisode);
+                    }
+
+                    function readAnilistIdFromObject(value, depth, seen, contextual) {
+                        if (!value || depth > 5) return '';
+                        if (typeof value === 'string' || typeof value === 'number') return contextual ? normalizeId(value) : '';
+                        if (typeof value !== 'object') return '';
+                        if (seen.has(value)) return '';
+
+                        seen.add(value);
+
+                        const exactKeys = ['anilistId', 'anilistID', 'aniListId', 'anilist_id', 'ani_list_id', 'mediaId', 'media_id', 'animeId', 'anime_id'];
+                        for (const key of exactKeys) {
+                            if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+                            const id = normalizeId(value[key]);
+                            if (id) return id;
+                        }
+
+                        if (Object.prototype.hasOwnProperty.call(value, 'id') && (contextual || objectLooksLikeAniListMediaObject(value))) {
+                            const id = normalizeId(value.id);
+                            if (id) return id;
+                        }
+
+                        for (const key of Object.keys(value)) {
+                            const nextContextual = contextual || /anilist|ani[_-]?list|anime|media|entry|card|details|schedule/.test(String(key).toLowerCase());
+                            if (!nextContextual && depth >= 3) continue;
+
+                            const id = readAnilistIdFromObject(value[key], depth + 1, seen, nextContextual);
+                            if (id) return id;
+                        }
+
+                        return '';
+                    }
+
+                    function getAnilistIdFromReactData(root) {
+                        if (!root) return '';
+
+                        const elements = [root];
+                        if (root.querySelectorAll) {
+                            root.querySelectorAll('a[href], [data-media-entry-card-body="true"], [data-media-entry-card-title-section-title="true"], [data-media-entry-card-body-image="true"], [data-schedule-calendar-event-item-finale-icon]').forEach(el => elements.push(el));
+                        }
+
+                        for (const element of elements) {
+                            const keys = Object.keys(element).filter(key => {
+                                return key.indexOf('__reactProps$') === 0 ||
+                                    key.indexOf('__reactFiber$') === 0 ||
+                                    key.indexOf('__reactInternalInstance$') === 0;
+                            });
+
+                            for (const key of keys) {
+                                const id = readAnilistIdFromObject(element[key], 0, new WeakSet(), false);
+                                if (id) return id;
+                            }
+                        }
+
+                        return '';
+                    }
+
+                    function getAnilistIdFromElement(root) {
+                        if (!root) return '';
+
+                        const directId = getStrictIdFromElement(root, true);
+                        if (directId) return directId;
+
+                        const child = root.querySelector && root.querySelector('[data-media-id], [data-anilist-id], [data-anilistid], [data-ani-list-id], [data-anilist-media-id], [data-media-anilist-id], [data-entry-anilist-id], [data-entry-media-id], [data-anime-id], [data-media-entry-id], [data-mediaentryid], [data-entry-id], [data-id], [data-schedule-media-id]');
+                        const childId = getStrictIdFromElement(child, true);
+                        if (childId) return childId;
+
+                        const links = root.querySelectorAll ? Array.from(root.querySelectorAll('a[href]')) : [];
+                        for (const link of links) {
+                            const hrefId = getAnilistIdFromHref(link.getAttribute('href'));
+                            if (hrefId) return hrefId;
+                        }
+
+                        const closestLink = root.closest ? root.closest('a[href]') : null;
+                        const closestHrefId = closestLink ? getAnilistIdFromHref(closestLink.getAttribute('href')) : '';
+                        if (closestHrefId) return closestHrefId;
+
+                        return getAnilistIdFromReactData(root);
+                    }
+
                     async function hasDubForAnimeCard(card) {
                         if (!card) return false;
 
                         const ids = await loadDubIds();
 
-                        const anilistId = normalizeId(card.getAttribute('data-media-id') || card.dataset.amaDubAnilistId || '');
+                        const anilistId = getAnilistIdFromElement(card) || normalizeId(card.getAttribute('data-media-id') || card.dataset.amaDubAnilistId || '');
                         const malId = normalizeId(card.getAttribute('data-media-mal-id') || card.dataset.amaDubMalId || '');
+
+                        if (anilistId) card.dataset.amaDubAnilistId = anilistId;
 
                         return ids.has(anilistId) || ids.has(malId);
                     }
+
+                    async function hasDubForScheduleEvent(event) {
+                        if (!event) return false;
+
+                        const details = await getDubForScheduleEvent(event);
+                        return !!details;
+                    }
+
+                    async function getDubForScheduleEvent(event) {
+                        if (!event) return null;
+
+                        const episodeNumber = getScheduleEpisodeNumber(event);
+                        if (!episodeNumber) return null;
+
+                        const anilistId = getAnilistIdFromElement(event) || normalizeId(event.getAttribute('data-media-id') || event.dataset.amaDubAnilistId || '');
+                        const title = getScheduleTitle(event);
+                        const scheduleDate = getScheduleDate(event);
+
+                        if (anilistId) event.dataset.amaDubAnilistId = anilistId;
+
+                        const apiEntries = await loadAnimeScheduleApiDubEntriesNear(scheduleDate);
+                        if (Array.isArray(apiEntries)) {
+                            const apiMatch = apiEntries.find(entry => asunaTracksScheduleEntryMatchesSchedule(entry, anilistId, title, scheduleDate));
+                            if (apiMatch) {
+                                event.dataset.amaScheduleDubMatch = 'episode-api';
+                                return getScheduleDubMatchDetails(apiMatch, 'api');
+                            }
+                        }
+
+                        if (canUseScheduleFallback(scheduleDate)) {
+                            const fallbackEntries = await loadAnimeScheduleFeedDubEntries();
+                            const fallbackMatch = fallbackEntries.find(entry => animeScheduleEntryMatchesSchedule(entry, anilistId, title, episodeNumber, scheduleDate));
+                            if (fallbackMatch) {
+                                event.dataset.amaScheduleDubMatch = 'episode-fallback';
+                                return getScheduleDubMatchDetails(fallbackMatch, 'fallback');
+                            }
+                        }
+
+                        event.dataset.amaScheduleDubMatch = 'none';
+                        return null;
+                    }
+
+                    function setAnimeScheduleApiToken(value) {
+                        clearAnimeScheduleApiTokenSetting();
+                        syncAnimeScheduleApiTokenToDom();
+                        animeScheduleDubApiEntriesPromises = new Map();
+                        animeScheduleAnimeDetailsPromises.clear();
+                        scheduleRoot(document.body || document.documentElement);
+                    }
+
+                    function getOpenScheduleSettingsDialog(dialogId) {
+                        return null;
+                    }
+
+                    function enhanceScheduleSettingsDialog(dialogId) {
+                        clearAnimeScheduleApiTokenSetting();
+                    }
+
+                    window.__AMA_DUB_DEBUG_SCHEDULE__ = async function() {
+                        const seen = new Set();
+                        let events = Array.from(document.querySelectorAll(scheduleEventQuery))
+                            .map(event => getScheduleEventElement(event))
+                            .filter(event => {
+                                if (!event || seen.has(event)) return false;
+                                seen.add(event);
+                                return isVisibleScheduleEvent(event);
+                            })
+                            .slice(0, 40);
+
+                        if (!events.length) {
+                            seen.clear();
+                            events = Array.from(document.querySelectorAll(scheduleEventQuery))
+                                .map(event => getScheduleEventElement(event))
+                                .filter(event => {
+                                    if (!event || seen.has(event)) return false;
+                                    seen.add(event);
+                                    return true;
+                                })
+                                .slice(0, 40);
+                        }
+
+                        return Promise.all(events.map(async event => {
+                            const item = getScheduleEventElement(event);
+                            const episodeNumber = getScheduleEpisodeNumber(item);
+                            const anilistId = getAnilistIdFromElement(item);
+                            const title = getScheduleTitle(item);
+                            const scheduleDate = getScheduleDate(item);
+                            const weekInfo = getIsoWeekInfo(scheduleDate);
+                            const apiTokenConfigured = !!getAnimeScheduleApiToken();
+                            const apiEntries = await loadAnimeScheduleApiDubEntriesNear(scheduleDate);
+                            const fallbackAllowed = canUseScheduleFallback(scheduleDate);
+                            const fallbackEntries = fallbackAllowed && !Array.isArray(apiEntries) ? await loadAnimeScheduleFeedDubEntries() : [];
+                            const sourceEntries = Array.isArray(apiEntries) ? apiEntries : fallbackEntries;
+                            const matchedEntry = Array.isArray(apiEntries)
+                                ? sourceEntries.find(entry => asunaTracksScheduleEntryMatchesSchedule(entry, anilistId, title, scheduleDate))
+                                : sourceEntries.find(entry => animeScheduleEntryMatchesSchedule(entry, anilistId, title, episodeNumber, scheduleDate));
+                            const exactMatched = !!matchedEntry;
+                            const latestEntry = getBestDubEntryForAnime(apiEntries, anilistId, title) || getBestDubEntryForAnime(fallbackEntries, anilistId, title);
+                            const matchDetails = matchedEntry
+                                ? getScheduleDubMatchDetails(matchedEntry, Array.isArray(apiEntries) ? 'api' : 'fallback')
+                                : null;
+
+                            return {
+                                title,
+                                anilistId,
+                                episodeNumber,
+                                week: weekInfo.week,
+                                year: weekInfo.year,
+                                apiTokenConfigured,
+                                animeScheduleApiStatus: window.__AMA_ANIME_SCHEDULE_API_STATUS__ || null,
+                                serverApiStatus: document.body ? document.body.getAttribute('data-ama-server-schedule-api-status') || '' : '',
+                                serverApiDetail: document.body ? document.body.getAttribute('data-ama-server-schedule-api-detail') || '' : '',
+                                apiStatus: Array.isArray(apiEntries) ? (apiTokenConfigured ? 'loaded-with-token' : 'loaded-public') : (apiTokenConfigured ? 'failed-or-empty' : 'public-failed'),
+                                apiEntryCount: Array.isArray(apiEntries) ? apiEntries.length : null,
+                                source: Array.isArray(apiEntries) ? 'api' : (fallbackAllowed ? 'fallback' : 'api'),
+                                fallbackAllowed,
+                                exactMatched,
+                                latestDubEpisode: latestEntry ? getAnimeScheduleEntryEpisodeNumber(latestEntry) : '',
+                                latestDubDate: latestEntry ? String((getAnimeScheduleEntryDate(latestEntry) || {}).toISOString ? getAnimeScheduleEntryDate(latestEntry).toISOString() : '') : '',
+                                matchDetails,
+                                matched: !!matchDetails,
+                                mode: exactMatched ? 'same-day-dub-for-anime' : (latestEntry ? 'no-same-day-dub-match' : 'none')
+                            };
+                        }));
+                    };
 
                     function removeArrowArtifacts(root) {
                         if (!root || !isElement(root)) return;
@@ -1987,6 +3757,151 @@ function init() {
                         }
                     }
 
+                    function createDubMediaBadge(extraClass) {
+                        const dubBadge = document.createElement('span');
+                        dubBadge.className = 'ama-media-badge dub' + (extraClass ? ' ' + extraClass : '');
+                        dubBadge.title = 'Dub available';
+                        dubBadge.setAttribute('aria-label', 'Dub available');
+                        dubBadge.setAttribute('aria-hidden', 'true');
+                        dubBadge.hidden = true;
+                        dubBadge.innerHTML = MIC_ICON;
+
+                        return dubBadge;
+                    }
+
+                    function updateScheduleDubBadge(badge, details) {
+                        const episodeLabel = details && details.episodeNumber ? ' Ep. ' + details.episodeNumber : '';
+                        const sourceLabel = details && details.source ? ' (' + details.source + ')' : '';
+                        const dateLabel = details && details.episodeDate ? ' - ' + details.episodeDate : '';
+                        badge.textContent = 'DUB' + episodeLabel;
+                        badge.title = 'Dub' + episodeLabel + sourceLabel + dateLabel;
+                        badge.setAttribute('aria-label', badge.title);
+                    }
+
+                    function isInsideScheduleArea(node) {
+                        if (!node || !node.closest) return false;
+
+                        if (node.closest('[data-schedule-calendar-event-item-link], [data-schedule-calendar-mobile-list-day-item-event-link], [data-schedule-calendar-event-item], [data-schedule-calendar-mobile-list-day-item-event-content], [data-schedule-event-item], [data-schedule-media-id]')) return true;
+                        if (node.closest('[data-schedule-calendar], [data-schedule-calendar-week], [data-schedule-calendar-mobile-list], [data-schedule-calendar-day], [data-schedule-page], [data-route="schedule"]')) return true;
+
+                        const path = String(window.location.pathname || '').toLowerCase();
+                        const hash = String(window.location.hash || '').toLowerCase();
+                        if (!path.includes('schedule') && !hash.includes('schedule')) return false;
+
+                        return !!node.closest('main, [role="main"], body');
+                    }
+
+                    function getScheduleEventElement(root) {
+                        if (!root || !root.closest) return root;
+
+                        const event = root.closest('[data-schedule-calendar-event-item-link], [data-schedule-calendar-mobile-list-day-item-event-link], [data-schedule-calendar-event-item], [data-schedule-calendar-event-item-root], [data-schedule-calendar-mobile-list-day-item-event-content], [data-schedule-event-item], [data-schedule-media-id]');
+                        if (event) return event;
+
+                        const link = root.closest(scheduleEntryLinkQuery);
+                        if (link && isInsideScheduleArea(link)) return link;
+
+                        return root;
+                    }
+
+                    function isVisibleScheduleEvent(root) {
+                        const event = getScheduleEventElement(root);
+                        if (!event || !event.isConnected) return false;
+
+                        const style = window.getComputedStyle ? window.getComputedStyle(event) : null;
+                        if (style && (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')) return false;
+
+                        const rects = event.getClientRects ? event.getClientRects() : [];
+                        if (!rects || !rects.length) return false;
+
+                        const rect = event.getBoundingClientRect ? event.getBoundingClientRect() : null;
+                        if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+
+                        return true;
+                    }
+
+                    function getScheduleBadgeAnchor(event) {
+                        if (!event || !event.querySelector) return null;
+
+                        const finaleIcon = event.querySelector('[data-schedule-calendar-event-item-finale-icon]');
+                        if (finaleIcon) return finaleIcon.parentElement || finaleIcon;
+
+                        const mobileIcons = event.querySelector('[data-schedule-calendar-mobile-list-day-item-event-icons]');
+                        if (mobileIcons) return mobileIcons;
+
+                        return event.querySelector('[data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-text], [data-schedule-calendar-event-item-title], [data-schedule-calendar-mobile-list-day-item-event-text], [data-schedule-event-title], [data-media-title], a[href]') || event;
+                    }
+
+                    function insertScheduleDubBadge(anchor, badge) {
+                        if (!anchor || !badge || badge.isConnected) return;
+
+                        if (anchor.matches && anchor.matches('[data-schedule-calendar-mobile-list-day-item-event-icons]')) {
+                            anchor.appendChild(badge);
+                            return;
+                        }
+
+                        anchor.insertAdjacentElement('afterend', badge);
+                    }
+
+                    function removeScheduleDubBadges(root) {
+                        if (!root) return;
+
+                        if (root.matches && root.matches('.ama-schedule-dub-badge, .ama-schedule-dub-badge-server')) {
+                            root.remove();
+                        }
+
+                        if (root.querySelectorAll) {
+                            root.querySelectorAll('.ama-schedule-dub-badge, .ama-schedule-dub-badge-server').forEach(badge => badge.remove());
+                            root.querySelectorAll('[data-ama-schedule-dub-enhanced]').forEach(event => {
+                                delete event.dataset.amaScheduleDubEnhanced;
+                            });
+                        }
+                    }
+
+                    function cleanupStrayScheduleDubBadges(root) {
+                        if (!root || !root.querySelectorAll) return;
+
+                        root.querySelectorAll('.ama-schedule-dub-badge, .ama-schedule-dub-badge-server').forEach(badge => {
+                            if (!isInsideScheduleArea(badge)) badge.remove();
+                        });
+                    }
+
+                    function enhanceScheduleEvent(root) {
+                        if (!featureSettings.subDubIcons) {
+                            removeScheduleDubBadges(root);
+                            return;
+                        }
+
+                        const event = getScheduleEventElement(root);
+                        if (!event || !event.querySelector) return;
+                        if (!isInsideScheduleArea(event)) return;
+                        if (event.dataset.amaScheduleDubEnhanced === "true") return;
+
+                        const anchor = getScheduleBadgeAnchor(event);
+                        if (!anchor) return;
+
+                        const badge = event.querySelector('.ama-schedule-dub-badge:not(.ama-schedule-dub-badge-server)') || createDubMediaBadge('ama-schedule-dub-badge');
+                        badge.hidden = true;
+                        badge.setAttribute('aria-hidden', 'true');
+
+                        insertScheduleDubBadge(anchor, badge);
+
+                        event.dataset.amaScheduleDubEnhanced = "true";
+
+                        getDubForScheduleEvent(event).then(details => {
+                            if (!badge.isConnected) return;
+                            if (!featureSettings.subDubIcons) return;
+
+                            if (details) {
+                                updateScheduleDubBadge(badge, details);
+                                badge.hidden = false;
+                                badge.setAttribute('aria-hidden', 'false');
+                            } else {
+                                badge.hidden = true;
+                                badge.setAttribute('aria-hidden', 'true');
+                            }
+                        });
+                    }
+
                     function enhanceMediaEntryCard(card) {
                         if (!featureSettings.subDubIcons) {
                             removeMediaBadges(card);
@@ -2019,13 +3934,7 @@ function init() {
                         const badges = document.createElement('span');
                         badges.className = 'ama-media-badges';
 
-                        const dubBadge = document.createElement('span');
-                        dubBadge.className = 'ama-media-badge dub';
-                        dubBadge.title = 'Dub available';
-                        dubBadge.setAttribute('aria-label', 'Dub available');
-                        dubBadge.setAttribute('aria-hidden', 'true');
-                        dubBadge.hidden = true;
-                        dubBadge.innerHTML = MIC_ICON;
+                        const dubBadge = createDubMediaBadge('');
 
                         const ccBadge = document.createElement('span');
                         ccBadge.className = 'ama-media-badge cc';
@@ -3056,7 +4965,7 @@ function init() {
                             const language = (extension && extension.language) || data.language || 'Unknown';
                             const description = (extension && extension.description) || data.description || '';
                             const canManage = !!actionId && manifestUri !== 'builtin';
-                            const canShowPreferences = isKolex06VersionExtension(data, extension) || !!(extension && extension.userConfig);
+                            const canShowPreferences = !!(extension && extension.userConfig);
 
                             modal.innerHTML =
                                 '<button type="button" class="ama-modal-close">Close</button>' +
@@ -3086,12 +4995,8 @@ function init() {
                             const preferences = modal.querySelector('[data-ama-more-action="preferences"]');
                             if (preferences) {
                                 preferences.onclick = () => {
-                                    if (isKolex06VersionExtension(data, extension)) {
-                                        renderKolex06VersionPreferencesModal(modal);
-                                    } else {
-                                        modal.remove();
-                                        showInstalledPreferences(card);
-                                    }
+                                    modal.remove();
+                                    showInstalledPreferences(card);
                                 };
                             }
 
@@ -4007,14 +5912,7 @@ function init() {
                         }
 
                         if (action === 'preferences') {
-                            const data = getExtensionCardData(sourceCard);
-
-                            if (isKolex06VersionExtension(data)) {
-                                showKolex06VersionPreferences();
-                            } else {
-                                showInstalledPreferences(sourceCard);
-                            }
-
+                            showInstalledPreferences(sourceCard);
                             return;
                         }
 
@@ -4111,13 +6009,7 @@ function init() {
                             }
 
                             if (action === 'preferences') {
-                                const data = getExtensionCardData(card);
-
-                                if (isKolex06VersionExtension(data)) {
-                                    showKolex06VersionPreferences();
-                                } else {
-                                    showInstalledPreferences(card);
-                                }
+                                showInstalledPreferences(card);
                             }
                         }
 
@@ -4143,7 +6035,7 @@ function init() {
                         ensureCatalogActionHandler();
 
                         if (isInstalledCatalog || isInstalled) {
-                            if (isKolex06VersionExtension(data) || sourceCardHasNativePreferences(sourceCard)) {
+                            if (sourceCardHasNativePreferences(sourceCard)) {
                                 addCloneAction(actions, 'Preferences', SETTINGS_ICON, 'preferences', sourceId, extensionId);
                             } else {
                                 hasPreferencesForCard(sourceCard).then(hasPreferences => {
@@ -4831,6 +6723,7 @@ function init() {
 
                         if (!featureSettings.subDubIcons) {
                             cleanupAllMediaBadges(root);
+                            removeScheduleDubBadges(root);
                         }
 
                         if (!featureSettings.useBas1874Marketplace) {
@@ -4855,6 +6748,14 @@ function init() {
                                 document.querySelectorAll(mediaEntryCardQuery).forEach(card => {
                                     enhanceMediaEntryCard(card);
                                 });
+
+                                document.querySelectorAll(scheduleEventQuery).forEach(event => {
+                                    enhanceScheduleEvent(event);
+                                });
+
+                                document.querySelectorAll(scheduleEntryLinkQuery).forEach(link => {
+                                    if (isInsideScheduleArea(link)) enhanceScheduleEvent(link);
+                                });
                             }
 
                             if (featureSettings.betterMarketplace) {
@@ -4871,6 +6772,7 @@ function init() {
 
                             optimizeImages(document);
                             removeRandomSearchIcons(document);
+                            cleanupStrayScheduleDubBadges(document);
                             return;
                         }
 
@@ -4884,6 +6786,16 @@ function init() {
 
                         if (root.matches && root.matches(mediaEntryCardQuery)) {
                             enhanceMediaEntryCard(root);
+                            return;
+                        }
+
+                        if (root.matches && root.matches(scheduleEventQuery)) {
+                            enhanceScheduleEvent(root);
+                            return;
+                        }
+
+                        if (root.matches && root.matches(scheduleEntryLinkQuery)) {
+                            if (isInsideScheduleArea(root)) enhanceScheduleEvent(root);
                             return;
                         }
 
@@ -4903,7 +6815,17 @@ function init() {
                                 root.querySelectorAll(mediaEntryCardQuery).forEach(card => {
                                     enhanceMediaEntryCard(card);
                                 });
+
+                                root.querySelectorAll(scheduleEventQuery).forEach(event => {
+                                    enhanceScheduleEvent(event);
+                                });
+
+                                root.querySelectorAll(scheduleEntryLinkQuery).forEach(link => {
+                                    if (isInsideScheduleArea(link)) enhanceScheduleEvent(link);
+                                });
                             }
+
+                            cleanupStrayScheduleDubBadges(root);
 
                             if (featureSettings.betterMarketplace) {
                                 root.querySelectorAll(cardQuery).forEach(card => {
@@ -4953,8 +6875,14 @@ function init() {
                     }
 
                     window.__AMA_SAVE_SETTINGS__ = function(nextSettings) {
-                        featureSettings = normalizeFeatureSettings(nextSettings);
+                        const savedSettings = readBrowserSettings();
+                        featureSettings = normalizeFeatureSettings(Object.assign({}, savedSettings, featureSettings, nextSettings || {}));
                         writeBrowserSettings(featureSettings);
+                        clearAnimeScheduleApiTokenSetting();
+                        syncAnimeScheduleApiTokenToDom();
+                        animeScheduleDubApiEntriesPromises = new Map();
+                        animeScheduleDubFeedEntriesPromise = null;
+                        animeScheduleAnimeDetailsPromises.clear();
 
                         applyBas1874MarketplacePreference();
                         setBodyFlags();
@@ -4977,6 +6905,7 @@ function init() {
 
                         if (!featureSettings.subDubIcons) {
                             cleanupAllMediaBadges(document);
+                            removeScheduleDubBadges(document);
                         }
 
                         if (!featureSettings.useBas1874Marketplace) {
@@ -5020,6 +6949,7 @@ function init() {
 
                     setBodyFlags();
                     writeBrowserSettings(featureSettings);
+                    syncAnimeScheduleApiTokenToDom();
                     applyBas1874MarketplacePreference();
                     processRoot(document);
 
@@ -5031,8 +6961,12 @@ function init() {
                                 if (
                                     node.matches('.ama-carousel-nav-btn') ||
                                     node.matches('.ama-manga-carousel-parent') ||
+                                    node.matches('[role="dialog"]') ||
+                                    node.matches('[data-radix-popper-content-wrapper]') ||
                                     node.matches(targetGridsQuery) ||
                                     node.matches(mediaEntryCardQuery) ||
+                                    node.matches(scheduleEventQuery) ||
+                                    (node.matches(scheduleEntryLinkQuery) && isInsideScheduleArea(node)) ||
                                     node.matches(cardQuery) ||
                                     node.matches('svg')
                                 ) {
@@ -5042,7 +6976,7 @@ function init() {
 
                                 if (
                                     node.querySelector &&
-                                    node.querySelector(arrowQuery + ', ' + targetGridsQuery + ', ' + mediaEntryCardQuery + ', ' + cardQuery + ', svg')
+                                    node.querySelector(arrowQuery + ', ' + targetGridsQuery + ', ' + mediaEntryCardQuery + ', ' + scheduleEventQuery + ', ' + scheduleEntryLinkQuery + ', ' + cardQuery + ', svg')
                                 ) {
                                     scheduleRoot(node);
                                 }
