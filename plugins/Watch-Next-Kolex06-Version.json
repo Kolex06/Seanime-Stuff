@@ -1,7 +1,7 @@
 {
   "id": "Watch-Next-Kolex06-Version",
   "name": "Watch Next Kolex06-Version",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
@@ -10,7 +10,7 @@
   "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/Watch-Next-Kolex06-Version.png",
   "website": "",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/README.md",
-  "notes": "Sidebar-only build. Swaps the Move down and Open anime row action positions while keeping compact icon controls, full AniList order sync, and 429 retry safety.",
+  "notes": "Sidebar-only build. Fixes toggle-off events by sending and reading explicit enabled values instead of treating wrapped payload objects as true.",
   "lang": "en",
   "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/provider.ts",
   "plugin": {
@@ -35,3 +35,4 @@
     }
   }
 }
+

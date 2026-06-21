@@ -20,6 +20,11 @@ Kolex06-styled Seanime plugin for building a personal Watch Next anime queue.
 
 ## Version History
 
+### 1.0.6
+
+- Fixed Auto-remove CURRENT and Auto-sync AniList toggle-off events by sending and reading explicit `enabled` values.
+- Replaced the toggle checkboxes with controlled toggle buttons and uses saved setting values as the source of truth.
+
 ### 1.0.5
 
 - Swapped the Move down and Open anime row action positions.
@@ -62,3 +67,4 @@ When serving this repository locally on port `18126`, use:
 ```text
 http://127.0.0.1:18126/plugins/Watch-Next-Kolex06-Version.local.json
 ```
+
