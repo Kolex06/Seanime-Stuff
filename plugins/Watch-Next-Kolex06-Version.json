@@ -2,7 +2,7 @@
   "id": "Watch-Next-Kolex06-Version",
   "name": "Watch Next Kolex06-Version",
   "version": "1.0.6",
-  "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json",
+  "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json?rev=938ae9d6",
   "language": "typescript",
   "type": "plugin",
   "description": "Kolex06-styled sidebar Watch Next queue for Seanime with drag-handle ordering and automatic AniList custom-list sync in queue order.",
