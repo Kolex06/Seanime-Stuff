@@ -605,7 +605,907 @@ function init() {
 							}
 						}
 					}
-				`, …6359 tokens truncated…ect = row.getBoundingClientRect();
+				`, { userId });
+
+				const entries: any[] = [];
+				const customListsByMediaId = new Map<number, string[]>();
+				const standardListNames = new Set(["CURRENT", "PLANNING", "COMPLETED", "DROPPED", "PAUSED", "REPEATING"]);
+				(collectionData?.MediaListCollection?.lists || []).forEach((list: any) => {
+					const listName = String(list?.name || "").trim();
+					const isCustomList = list?.isCustomList === true || (!!listName && !standardListNames.has(listName.toUpperCase()));
+					(list.entries || []).forEach((entry: any) => {
+						entries.push(entry);
+						const mediaId = Number(entry?.mediaId || entry?.media?.id || 0);
+						if (!mediaId || !isCustomList || !listName) return;
+						const current = customListsByMediaId.get(mediaId) || [];
+						customListsByMediaId.set(mediaId, uniqueStringList([...current, listName]));
+					});
+				});
+
+				const byMediaId = new Map<number, any>();
+				entries.forEach((entry) => {
+					const mediaId = Number(entry?.mediaId || entry?.media?.id || 0);
+					if (mediaId && !byMediaId.has(mediaId)) byMediaId.set(mediaId, entry);
+				});
+
+				function currentCustomListsForMedia(mediaId: number, entry: any) {
+					return uniqueStringList([
+						...normalizeCustomLists(entry?.customLists),
+						...(customListsByMediaId.get(mediaId) || []),
+					]);
+				}
+
+				const existingWatchNextIds = new Set<number>();
+				customListsByMediaId.forEach((listNames, mediaId) => {
+					if (listNames.some((name) => name === aniListCustomListName)) {
+						existingWatchNextIds.add(mediaId);
+					}
+				});
+
+				const queuedIds = new Set(orderedList.get().map((anime) => Number(anime.id)));
+				let added = 0;
+				let removed = 0;
+				let created = 0;
+				let ordered = 0;
+
+				for (const mediaId of Array.from(existingWatchNextIds.values())) {
+					if (queuedIds.has(mediaId)) continue;
+
+					const entry = byMediaId.get(mediaId);
+					const currentLists = currentCustomListsForMedia(mediaId, entry);
+					const nextLists = currentLists.filter((name) => name !== aniListCustomListName);
+					if (sameStringList(currentLists, nextLists)) continue;
+
+					await saveAniListEntryCustomLists(mediaId, nextLists);
+					customListsByMediaId.set(mediaId, nextLists);
+					removed++;
+				}
+
+				const orderedQueue = orderedList.get().filter((anime) => Number(anime.id) > 0);
+				for (let index = orderedQueue.length - 1; index >= 0; index--) {
+					const mediaId = Number(orderedQueue[index]?.id || 0);
+					if (!mediaId) continue;
+					const priority = orderedQueue.length - index;
+					const progress = orderedQueue.length - index;
+
+					const entry = byMediaId.get(mediaId);
+					const currentLists = currentCustomListsForMedia(mediaId, entry);
+					const hasWatchNext = existingWatchNextIds.has(mediaId) || currentLists.some((name) => name === aniListCustomListName);
+					const nextLists = uniqueStringList([...currentLists, aniListCustomListName]);
+
+					aniListSyncStatus.set("Ordering AniList Watch Next " + progress + "/" + orderedQueue.length + "...");
+					sendSnapshot();
+
+					await saveAniListEntryCustomLists(mediaId, nextLists, entry ? undefined : "PLANNING", priority);
+					customListsByMediaId.set(mediaId, nextLists);
+					byMediaId.set(mediaId, { ...(entry || {}), mediaId, customLists: nextLists, priority });
+					existingWatchNextIds.add(mediaId);
+
+					if (!entry) {
+						created++;
+					} else if (!hasWatchNext) {
+						added++;
+					}
+					ordered++;
+				}
+
+				const message = madeListVisible || added || created || removed || ordered
+					? "AniList list '" + aniListCustomListName + "' synced. Created " + created + ", added " + added + ", removed " + removed + ", ordered " + ordered + ". Refresh AniList if it is already open."
+					: "AniList list '" + aniListCustomListName + "' is already up to date. Refresh AniList if it is already open.";
+				aniListSyncStatus.set(message);
+				ctx.toast.success(message);
+			} catch (error: any) {
+				const message = error?.message || "Failed to sync Watch Next to AniList.";
+				aniListSyncStatus.set(message);
+				ctx.toast.error(message);
+			} finally {
+				isSyncingAniList.set(false);
+				sendSnapshot();
+			}
+		}
+
+		$store.watch<$app.AL_AnimeCollection>("watch-next-kolex06.latestAnimeCollection", (newCollection) => {
+			if (!autoRemoveSetting || !newCollection?.MediaListCollection?.lists) return;
+
+			const currentIds = new Set<number>();
+			newCollection.MediaListCollection.lists.forEach((list: any) => {
+				if ($toString(list.status) !== "CURRENT") return;
+				(list.entries || []).forEach((entry: any) => {
+					if (entry?.media?.id) currentIds.add(Number(entry.media.id));
+				});
+			});
+
+			if (!currentIds.size) return;
+
+			const current = orderedList.get();
+			const next = current.filter((anime) => !currentIds.has(anime.id));
+			if (next.length === current.length) return;
+
+			orderedList.set(next);
+			saveListToStorage(next);
+			refreshAvailableAnime();
+			ctx.toast.info("Removed anime that moved to your CURRENT list.");
+			sendSnapshot();
+			scheduleAniListAutoSync("auto-remove");
+		});
+
+		webview.channel.on("hydrate", () => {
+			loadDataFromStorage();
+			refreshAvailableAnime();
+			sendSnapshot();
+		});
+
+		webview.channel.on("open-add-view", () => {
+			void openAddView();
+		});
+
+		webview.channel.on("open-main-view", () => {
+			currentView.set("main");
+			sendSnapshot();
+		});
+
+		webview.channel.on("add-anime", (mediaId: number) => addAnime(Number(mediaId)));
+		webview.channel.on("remove-anime", (mediaId: number) => removeAnime(Number(mediaId)));
+		webview.channel.on("remove-all", () => clearList());
+		webview.channel.on("reorder-list", (ids: number[]) => reorderList((ids || []).map(Number)));
+		webview.channel.on("move-anime", (payload: { id: number; direction: number }) => {
+			moveAnime(Number(payload?.id), Number(payload?.direction || 0));
+		});
+		webview.channel.on("toggle-auto-remove", (value: any) => {
+			const enabled = readToggleEnabled(value, autoRemoveSetting);
+			setAutoRemove(enabled);
+			sendSnapshot({ autoRemoveEnabled: enabled });
+		});
+		webview.channel.on("toggle-auto-sync-anilist", (value: any) => {
+			const enabled = readToggleEnabled(value, autoSyncAniListSetting);
+			setAutoSyncAniList(enabled);
+			if (enabled) {
+				scheduleAniListAutoSync("auto-sync being enabled", true);
+			} else {
+				if (pendingAutoSyncCancel) {
+					pendingAutoSyncCancel();
+					pendingAutoSyncCancel = null;
+				}
+				aniListSyncStatus.set("AniList auto-sync is off. Use Sync AniList List when you want to update it.");
+				sendSnapshot({
+					autoSyncAniListEnabled: false,
+					aniListSyncStatus: "AniList auto-sync is off. Use Sync AniList List when you want to update it.",
+				});
+				return;
+			}
+		});
+		webview.channel.on("sync-anilist-list", () => {
+			void syncQueueToAniList();
+		});
+		webview.channel.on("open-anime", (mediaId: number) => openAnime(Number(mediaId)));
+
+		webview.setContent(() => `
+			<!DOCTYPE html>
+			<html lang="en">
+			<head>
+				<meta charset="UTF-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<style>
+					:root {
+						color-scheme: dark;
+						--page: transparent;
+						--surface: rgba(9, 14, 24, 0.86);
+						--surface-2: rgba(18, 26, 42, 0.82);
+						--surface-3: rgba(28, 39, 61, 0.86);
+						--text: #f8fafc;
+						--muted: #cbd5e1;
+						--subtle: #94a3b8;
+						--border: rgba(226, 232, 240, 0.16);
+						--border-strong: rgba(125, 211, 252, 0.42);
+						--cyan: #38bdf8;
+						--pink: #fb7185;
+						--gold: #fbbf24;
+						--green: #34d399;
+						--danger: #f43f5e;
+						--shadow: 0 18px 54px rgba(0, 0, 0, 0.28);
+					}
+
+					* { box-sizing: border-box; }
+
+					html, body {
+						min-height: 100%;
+						margin: 0;
+						background: var(--page);
+						color: var(--text);
+						font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+						font-size: 15px;
+						line-height: 1.45;
+					}
+
+					button, input, select { font: inherit; }
+					button { color: inherit; }
+
+					.app-shell {
+						width: min(1180px, calc(100vw - 28px));
+						margin: 0 auto;
+						padding: 18px 0 28px;
+					}
+
+					.header {
+						display: grid;
+						grid-template-columns: minmax(0, 1fr) auto;
+						gap: 16px;
+						align-items: end;
+						margin-bottom: 16px;
+					}
+
+					.brand-row {
+						display: flex;
+						align-items: center;
+						gap: 12px;
+						min-width: 0;
+					}
+
+					.logo {
+						display: grid;
+						width: 52px;
+						height: 52px;
+						min-width: 52px;
+						place-items: center;
+						border: 1px solid rgba(251, 191, 36, 0.44);
+						border-radius: 8px;
+						background:
+							radial-gradient(circle at 30% 20%, rgba(251, 191, 36, 0.32), transparent 42%),
+							linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(251, 113, 133, 0.2)),
+							#101826;
+						box-shadow: 0 0 30px rgba(56, 189, 248, 0.16);
+						font-weight: 950;
+						letter-spacing: 0;
+					}
+
+					.kicker {
+						margin: 0 0 2px;
+						color: var(--gold);
+						font-size: 0.74rem;
+						font-weight: 900;
+						text-transform: uppercase;
+					}
+
+					h1 {
+						margin: 0;
+						color: var(--text);
+						font-size: clamp(1.72rem, 2.2vw, 2.5rem);
+						line-height: 1.03;
+						letter-spacing: 0;
+					}
+
+					.subtitle {
+						margin: 7px 0 0;
+						color: var(--muted);
+						font-weight: 650;
+					}
+
+					.actions {
+						display: flex;
+						flex-wrap: wrap;
+						gap: 8px;
+						justify-content: flex-end;
+					}
+
+					.btn {
+						display: inline-flex;
+						min-height: 38px;
+						align-items: center;
+						justify-content: center;
+						gap: 8px;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						padding: 8px 12px;
+						background: var(--surface-3);
+						color: var(--text);
+						font-weight: 850;
+						cursor: pointer;
+						transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, opacity 160ms ease;
+					}
+
+					.btn:hover {
+						transform: translateY(-1px);
+						border-color: var(--border-strong);
+						background: rgba(37, 51, 78, 0.94);
+					}
+
+					.btn:disabled {
+						cursor: not-allowed;
+						opacity: 0.5;
+						transform: none;
+					}
+
+					.btn-primary {
+						border-color: rgba(56, 189, 248, 0.48);
+						background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(236, 72, 153, 0.72));
+					}
+
+					.btn-danger {
+						border-color: rgba(244, 63, 94, 0.42);
+						background: rgba(88, 17, 35, 0.78);
+					}
+
+					.btn-plain {
+						min-height: 32px;
+						padding: 6px 9px;
+						background: rgba(15, 23, 42, 0.72);
+						font-size: 0.86rem;
+					}
+
+					.btn-icon {
+						width: 34px;
+						min-height: 34px;
+						padding: 0;
+					}
+
+					.btn-icon .icon {
+						display: block;
+						width: 17px;
+						height: 17px;
+						pointer-events: none;
+					}
+
+					.summary {
+						display: grid;
+						grid-template-columns: repeat(3, minmax(0, 1fr));
+						gap: 10px;
+						margin-bottom: 16px;
+					}
+
+					.metric {
+						min-width: 0;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						padding: 12px;
+						background: var(--surface-2);
+						box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+					}
+
+					.metric-label {
+						color: var(--subtle);
+						font-size: 0.76rem;
+						font-weight: 900;
+						text-transform: uppercase;
+					}
+
+					.metric-value {
+						overflow: hidden;
+						margin-top: 3px;
+						color: var(--text);
+						font-size: 1.2rem;
+						font-weight: 950;
+						text-overflow: ellipsis;
+						white-space: nowrap;
+					}
+
+					.toolbar {
+						display: grid;
+						grid-template-columns: minmax(180px, 1.3fr) repeat(4, minmax(130px, 0.7fr));
+						gap: 8px;
+						margin: 12px 0 16px;
+					}
+
+					.field {
+						display: flex;
+						flex-direction: column;
+						gap: 5px;
+						min-width: 0;
+					}
+
+					.field label {
+						color: var(--subtle);
+						font-size: 0.72rem;
+						font-weight: 900;
+						text-transform: uppercase;
+					}
+
+					.field input,
+					.field select {
+						width: 100%;
+						min-height: 40px;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						padding: 8px 10px;
+						background: rgba(15, 23, 42, 0.82);
+						color: var(--text);
+						outline: none;
+					}
+
+					.field input:focus,
+					.field select:focus {
+						border-color: var(--border-strong);
+						box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+					}
+
+					.queue {
+						display: flex;
+						flex-direction: column;
+						gap: 10px;
+					}
+
+					.queue-row {
+						display: grid;
+						grid-template-columns: 30px 34px 74px minmax(0, 1fr) auto;
+						gap: 12px;
+						align-items: center;
+						min-height: 106px;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						padding: 10px;
+						background: var(--surface);
+						box-shadow: var(--shadow);
+						transition: border-color 140ms ease, transform 140ms ease, background 140ms ease;
+					}
+
+					.queue-row.dragging {
+						opacity: 0.48;
+						transform: scale(0.992);
+					}
+
+					.queue-row.drag-over {
+						border-color: var(--gold);
+						background: rgba(37, 51, 78, 0.9);
+					}
+
+					.drag-handle {
+						display: grid;
+						width: 30px;
+						height: 46px;
+						place-items: center;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						background: rgba(15, 23, 42, 0.72);
+						color: var(--muted);
+						cursor: grab;
+						font-weight: 950;
+						letter-spacing: 0;
+						touch-action: none;
+						user-select: none;
+					}
+
+					.drag-handle:active {
+						cursor: grabbing;
+						border-color: var(--border-strong);
+						color: var(--text);
+					}
+
+					.rank {
+						display: grid;
+						width: 34px;
+						height: 34px;
+						place-items: center;
+						border: 1px solid rgba(251, 191, 36, 0.34);
+						border-radius: 8px;
+						background: rgba(251, 191, 36, 0.1);
+						color: var(--gold);
+						font-weight: 950;
+					}
+
+					.cover {
+						width: 74px;
+						height: 100px;
+						overflow: hidden;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						background: rgba(30, 41, 59, 0.72);
+					}
+
+					.cover img {
+						width: 100%;
+						height: 100%;
+						object-fit: cover;
+						display: block;
+					}
+
+					.cover-fallback {
+						display: grid;
+						width: 100%;
+						height: 100%;
+						place-items: center;
+						color: var(--subtle);
+						font-weight: 900;
+					}
+
+					.row-main {
+						min-width: 0;
+					}
+
+					.row-title {
+						margin: 0;
+						overflow-wrap: anywhere;
+						font-size: 1.02rem;
+						font-weight: 920;
+					}
+
+					.row-meta {
+						display: flex;
+						flex-wrap: wrap;
+						gap: 6px;
+						margin-top: 8px;
+					}
+
+					.badge {
+						display: inline-flex;
+						align-items: center;
+						border: 1px solid var(--border);
+						border-radius: 999px;
+						padding: 3px 8px;
+						background: rgba(15, 23, 42, 0.72);
+						color: var(--muted);
+						font-size: 0.76rem;
+						font-weight: 850;
+					}
+
+					.drag-hint {
+						margin-top: 8px;
+						color: var(--subtle);
+						font-size: 0.8rem;
+						font-weight: 700;
+					}
+
+					.row-actions {
+						display: grid;
+						grid-template-columns: repeat(2, 34px);
+						gap: 6px;
+						justify-content: end;
+					}
+
+					.empty {
+						display: grid;
+						min-height: 260px;
+						place-items: center;
+						border: 1px dashed rgba(148, 163, 184, 0.36);
+						border-radius: 8px;
+						padding: 28px;
+						background: rgba(15, 23, 42, 0.52);
+						text-align: center;
+					}
+
+					.empty h2 {
+						margin: 0 0 6px;
+						font-size: 1.24rem;
+					}
+
+					.empty p {
+						max-width: 480px;
+						margin: 0 auto 16px;
+						color: var(--muted);
+					}
+
+					.grid {
+						display: grid;
+						grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+						gap: 12px;
+					}
+
+					.anime-card {
+						min-width: 0;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						overflow: hidden;
+						background: var(--surface);
+						box-shadow: var(--shadow);
+					}
+
+					.poster {
+						position: relative;
+						aspect-ratio: 2 / 3;
+						background: rgba(30, 41, 59, 0.72);
+					}
+
+					.poster img {
+						width: 100%;
+						height: 100%;
+						object-fit: cover;
+						display: block;
+					}
+
+					.card-body {
+						display: flex;
+						min-height: 118px;
+						flex-direction: column;
+						gap: 8px;
+						padding: 10px;
+					}
+
+					.card-title {
+						display: -webkit-box;
+						overflow: hidden;
+						min-height: 42px;
+						-webkit-box-orient: vertical;
+						-webkit-line-clamp: 2;
+						font-weight: 900;
+					}
+
+					.card-meta {
+						color: var(--subtle);
+						font-size: 0.8rem;
+						font-weight: 780;
+					}
+
+					.card-body .btn {
+						width: 100%;
+						margin-top: auto;
+					}
+
+					.notice {
+						margin-bottom: 14px;
+						border: 1px solid rgba(251, 191, 36, 0.38);
+						border-radius: 8px;
+						padding: 12px;
+						background: rgba(251, 191, 36, 0.1);
+						color: #fde68a;
+						font-weight: 760;
+					}
+
+					.toggle {
+						display: inline-flex;
+						align-items: center;
+						gap: 8px;
+						min-height: 32px;
+						border: 1px solid var(--border);
+						border-radius: 8px;
+						padding: 6px 9px;
+						background: rgba(15, 23, 42, 0.72);
+						color: var(--muted);
+						font-weight: 800;
+						cursor: pointer;
+						user-select: none;
+						transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+					}
+
+					.toggle:hover {
+						transform: translateY(-1px);
+						border-color: var(--border-strong);
+						background: rgba(37, 51, 78, 0.94);
+					}
+
+					.toggle.is-on {
+						border-color: rgba(56, 189, 248, 0.46);
+						color: var(--text);
+					}
+
+					.toggle-indicator {
+						width: 10px;
+						height: 10px;
+						border-radius: 999px;
+						background: rgba(148, 163, 184, 0.68);
+					}
+
+					.toggle.is-on .toggle-indicator {
+						background: var(--cyan);
+						box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+					}
+
+					.toggle-state {
+						color: var(--subtle);
+						font-size: 0.75rem;
+						font-weight: 900;
+					}
+
+					.hidden { display: none !important; }
+
+					@media (max-width: 900px) {
+						.header {
+							grid-template-columns: 1fr;
+							align-items: start;
+						}
+
+						.actions {
+							justify-content: flex-start;
+						}
+
+						.summary {
+							grid-template-columns: 1fr;
+						}
+
+						.toolbar {
+							grid-template-columns: repeat(2, minmax(0, 1fr));
+						}
+					}
+
+					@media (max-width: 640px) {
+						.app-shell {
+							width: min(100vw - 20px, 1180px);
+							padding-top: 12px;
+						}
+
+						.brand-row {
+							align-items: flex-start;
+						}
+
+						.logo {
+							width: 44px;
+							height: 44px;
+							min-width: 44px;
+						}
+
+						h1 {
+							font-size: 1.55rem;
+						}
+
+						.toolbar {
+							grid-template-columns: 1fr;
+						}
+
+						.queue-row {
+							grid-template-columns: 30px 32px 62px minmax(0, 1fr);
+						}
+
+						.cover {
+							width: 62px;
+							height: 88px;
+						}
+
+						.row-actions {
+							grid-column: 1 / -1;
+							display: flex;
+							justify-content: flex-start;
+							flex-wrap: wrap;
+						}
+					}
+				</style>
+			</head>
+			<body>
+				<div id="app" class="app-shell"></div>
+				<script>
+					(function() {
+						var state = {
+							orderedList: [],
+							availableAnime: [],
+							currentView: "main",
+							isLoading: false,
+							errorMessage: null,
+							autoRemoveEnabled: false,
+							autoSyncAniListEnabled: true,
+							isSyncingAniList: false,
+							aniListSyncStatus: ""
+						};
+
+						var filters = {
+							search: "",
+							status: "PLANNING",
+							sort: "default",
+							year: "all",
+							season: "all"
+						};
+
+						var draggingId = null;
+						var dragOverId = null;
+						var pointerDrag = null;
+						var root = document.getElementById("app");
+
+						function send(name, value) {
+							if (window.webview && typeof window.webview.send === "function") {
+								window.webview.send(name, value);
+							}
+						}
+
+						function escapeText(value) {
+							return String(value == null ? "" : value);
+						}
+
+						function create(tag, className, text) {
+							var node = document.createElement(tag);
+							if (className) node.className = className;
+							if (text !== undefined && text !== null) node.textContent = String(text);
+							return node;
+						}
+
+						function button(label, className, onClick, title) {
+							var node = create("button", "btn " + (className || ""), label);
+							node.type = "button";
+							if (title) node.title = title;
+							node.onclick = onClick;
+							return node;
+						}
+
+						function icon(name) {
+							if (name === "open") {
+								return '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>';
+							}
+							if (name === "trash") {
+								return '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>';
+							}
+							return "";
+						}
+
+						function iconButton(name, className, onClick, title) {
+							var node = button("", className, onClick, title);
+							node.innerHTML = icon(name);
+							node.setAttribute("aria-label", title || name);
+							return node;
+						}
+
+						function toggleButton(label, enabled, onClick) {
+							var node = create("button", "toggle " + (enabled ? "is-on" : "is-off"));
+							node.type = "button";
+							node.setAttribute("aria-pressed", enabled ? "true" : "false");
+							node.appendChild(create("span", "toggle-indicator"));
+							node.appendChild(create("span", "toggle-label", label));
+							node.appendChild(create("span", "toggle-state", enabled ? "On" : "Off"));
+							node.onclick = onClick;
+							return node;
+						}
+
+						function coverNode(anime) {
+							var wrap = create("div", "cover");
+							if (anime.coverImage) {
+								var img = document.createElement("img");
+								img.src = anime.coverImage;
+								img.alt = anime.title || "Anime cover";
+								img.loading = "lazy";
+								img.draggable = false;
+								wrap.appendChild(img);
+							} else {
+								wrap.appendChild(create("div", "cover-fallback", "NO COVER"));
+							}
+							return wrap;
+						}
+
+						function seasonText(anime) {
+							var bits = [];
+							if (anime.season) bits.push(titleCase(anime.season));
+							if (anime.seasonYear) bits.push(String(anime.seasonYear));
+							return bits.join(" ");
+						}
+
+						function titleCase(value) {
+							return String(value || "").toLowerCase().replace(/(^|[_\\s-])([a-z])/g, function(_, sep, chr) {
+								return (sep ? " " : "") + chr.toUpperCase();
+							}).trim();
+						}
+
+						function reorderByIds(ids) {
+							var byId = {};
+							state.orderedList.forEach(function(anime) {
+								byId[String(anime.id)] = anime;
+							});
+
+							var next = [];
+							ids.forEach(function(id) {
+								var anime = byId[String(id)];
+								if (anime && !next.some(function(item) { return item.id === anime.id; })) {
+									next.push(anime);
+								}
+							});
+							state.orderedList.forEach(function(anime) {
+								if (!next.some(function(item) { return item.id === anime.id; })) {
+									next.push(anime);
+								}
+							});
+							state.orderedList = next;
+							send("reorder-list", next.map(function(anime) { return anime.id; }));
+							render();
+						}
+
+						function dropAnime(fromId, toId, insertAfter) {
+							fromId = Number(fromId);
+							toId = Number(toId);
+							if (!fromId || !toId || fromId === toId) return;
+
+							var ids = state.orderedList.map(function(anime) { return anime.id; });
+							var fromIndex = ids.indexOf(fromId);
+							var toIndex = ids.indexOf(toId);
+							if (fromIndex < 0 || toIndex < 0) return;
+
+							ids.splice(fromIndex, 1);
+							var insertIndex = ids.indexOf(toId);
+							if (insertIndex < 0) insertIndex = ids.length;
+							if (insertAfter) insertIndex += 1;
+							ids.splice(insertIndex, 0, fromId);
+							reorderByIds(ids);
+						}
+
+						function dropTargetFromPoint(clientX, clientY) {
+							var target = document.elementFromPoint(clientX, clientY);
+							var row = target && typeof target.closest === "function" ? target.closest(".queue-row") : null;
+							if (!row || !row.dataset) return null;
+
+							var id = Number(row.dataset.id);
+							if (!id) return null;
+
+							var rect = row.getBoundingClientRect();
 							return {
 								id: id,
 								after: clientY > rect.top + rect.height / 2
@@ -1114,4 +2014,3 @@ function init() {
 		loadDataFromStorage();
 	});
 }
-
