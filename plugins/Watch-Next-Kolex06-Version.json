@@ -1,16 +1,16 @@
 {
   "id": "Watch-Next-Kolex06-Version",
   "name": "Watch Next Kolex06-Version",
-  "version": "1.0.6",
-  "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json?rev=938ae9d6",
+  "version": "1.0.7",
+  "manifestURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/Watch-Next-Kolex06-Version.json",
   "language": "typescript",
   "type": "plugin",
-  "description": "Kolex06-styled sidebar Watch Next queue for Seanime with drag-handle ordering and automatic AniList custom-list sync in queue order.",
+  "description": "Kolex06-styled sidebar Watch Next queue for Seanime with drag-handle ordering and two-way AniList Watch Next sync.",
   "author": "Kolex06",
   "icon": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/main/icons/Watch-Next-Kolex06-Version.png",
   "website": "",
   "readme": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/README.md",
-  "notes": "Sidebar-only build. Fixes toggle-off events by sending and reading explicit enabled values instead of treating wrapped payload objects as true.",
+  "notes": "Sidebar-only build. Sync AniList List and Auto-sync AniList now sync Watch Next membership in both directions.",
   "lang": "en",
   "payloadURI": "https://raw.githubusercontent.com/Kolex06/Seanime-Stuff/refs/heads/main/plugins/WatchNextKolex06Version/provider.ts",
   "plugin": {
@@ -29,10 +29,9 @@
             "graphql.anilist.co",
             "s4.anilist.co"
           ],
-          "reasoning": "Required to display the Watch Next icon and AniList cover images, and to sync the queue into an AniList custom list."
+          "reasoning": "Required to display the Watch Next icon and AniList cover images, and to import/export the queue with an AniList custom list."
         }
       }
     }
   }
 }
-

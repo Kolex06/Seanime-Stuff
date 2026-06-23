@@ -29,6 +29,7 @@ function init() {
 	$ui.register((ctx) => {
 		const listStorageKey = "watch-next-kolex06.watchOrderList";
 		const settingsStorageKey = "watch-next-kolex06.settings";
+		const lastSyncedListStorageKey = "watch-next-kolex06.lastSyncedList";
 		const legacyListStorageKey = "watchOrderList";
 		const legacySettingsStorageKey = "watchOrderSettings";
 
@@ -123,6 +124,37 @@ function init() {
 
 		function saveSettingsToStorage(settings: WatchNextSettings) {
 			$storage.set(settingsStorageKey, settings);
+		}
+
+		function normalizedQueueIds(value: any): number[] {
+			if (!Array.isArray(value)) return [];
+			const seen = new Set<number>();
+			const ids: number[] = [];
+			value.forEach((item) => {
+				const id = Number(typeof item === "object" ? item?.id : item);
+				if (!Number.isFinite(id) || id <= 0 || seen.has(id)) return;
+				seen.add(id);
+				ids.push(id);
+			});
+			return ids;
+		}
+
+		function readLastSyncedList() {
+			const value = $storage.get<any>(lastSyncedListStorageKey);
+			return {
+				exists: Array.isArray(value),
+				ids: normalizedQueueIds(value),
+			};
+		}
+
+		function saveLastSyncedList(list: WatchOrderAnime[]) {
+			$storage.set(lastSyncedListStorageKey, normalizedQueueIds(list));
+		}
+
+		function sameQueueOrder(left: WatchOrderAnime[], right: WatchOrderAnime[]) {
+			const leftIds = normalizedQueueIds(left);
+			const rightIds = normalizedQueueIds(right);
+			return leftIds.length === rightIds.length && leftIds.every((id, index) => id === rightIds[index]);
 		}
 
 		function readToggleEnabled(value: any, fallback: boolean) {
@@ -483,6 +515,10 @@ function init() {
 			return result;
 		}
 
+		function isWatchNextList(name: any) {
+			return String(name || "").trim().toLowerCase() === aniListCustomListName.toLowerCase();
+		}
+
 		async function ensureAniListCustomListVisible(viewer: any) {
 			const animeOptions = viewer?.mediaListOptions?.animeList || {};
 			const currentCustomLists = normalizeCustomLists(animeOptions.customLists);
@@ -560,7 +596,7 @@ function init() {
 			if (isSyncingAniList.get()) return;
 
 			isSyncingAniList.set(true);
-			aniListSyncStatus.set("Syncing Watch Next to AniList...");
+			aniListSyncStatus.set("Syncing Watch Next with AniList...");
 			sendSnapshot();
 
 			try {
@@ -591,15 +627,20 @@ function init() {
 						MediaListCollection(userId: $userId, type: ANIME) {
 							lists {
 								name
+								status
 								isCustomList
 								entries {
 									id
 									mediaId
+									status
 									priority
 									customLists(asArray: true)
 									media {
 										id
 										title { userPreferred romaji english }
+										coverImage { large medium }
+										season
+										seasonYear
 									}
 								}
 							}
@@ -616,9 +657,14 @@ function init() {
 					(list.entries || []).forEach((entry: any) => {
 						entries.push(entry);
 						const mediaId = Number(entry?.mediaId || entry?.media?.id || 0);
-						if (!mediaId || !isCustomList || !listName) return;
+						if (!mediaId) return;
 						const current = customListsByMediaId.get(mediaId) || [];
-						customListsByMediaId.set(mediaId, uniqueStringList([...current, listName]));
+						const groupedList = isCustomList && listName ? [listName] : [];
+						customListsByMediaId.set(mediaId, uniqueStringList([
+							...current,
+							...normalizeCustomLists(entry?.customLists),
+							...groupedList,
+						]));
 					});
 				});
 
@@ -637,12 +683,70 @@ function init() {
 
 				const existingWatchNextIds = new Set<number>();
 				customListsByMediaId.forEach((listNames, mediaId) => {
-					if (listNames.some((name) => name === aniListCustomListName)) {
+					if (listNames.some((name) => isWatchNextList(name))) {
 						existingWatchNextIds.add(mediaId);
 					}
 				});
 
-				const queuedIds = new Set(orderedList.get().map((anime) => Number(anime.id)));
+				const remoteQueue: WatchOrderAnime[] = [];
+				Array.from(existingWatchNextIds.values()).forEach((mediaId) => {
+					const entry = byMediaId.get(mediaId);
+					const media = entry?.media || {};
+					remoteQueue.push({
+						id: mediaId,
+						listEntryId: Number(entry?.id || 0),
+						title: media?.title?.userPreferred || media?.title?.romaji || media?.title?.english || "Unknown Title",
+						coverImage: media?.coverImage?.large || media?.coverImage?.medium || "",
+						season: media?.season,
+						seasonYear: media?.seasonYear ? Number(media.seasonYear) : undefined,
+						status: entry?.status ? String(entry.status) : undefined,
+					});
+				});
+				remoteQueue.sort((left, right) => {
+					const leftPriority = Number(byMediaId.get(left.id)?.priority || 0);
+					const rightPriority = Number(byMediaId.get(right.id)?.priority || 0);
+					return rightPriority - leftPriority;
+				});
+
+				const localQueue = normalizeAnimeList(orderedList.get());
+				const localIds = new Set(localQueue.map((anime) => anime.id));
+				const remoteIds = new Set(remoteQueue.map((anime) => anime.id));
+				const lastSynced = readLastSyncedList();
+				const lastSyncedIds = new Set(lastSynced.ids);
+				const nextIds = new Set<number>();
+
+				if (!lastSynced.exists) {
+					localIds.forEach((id) => nextIds.add(id));
+					remoteIds.forEach((id) => nextIds.add(id));
+				} else {
+					const allIds = new Set<number>([...lastSynced.ids, ...Array.from(localIds), ...Array.from(remoteIds)]);
+					allIds.forEach((id) => {
+						const wasSynced = lastSyncedIds.has(id);
+						const isLocal = localIds.has(id);
+						const isRemote = remoteIds.has(id);
+						const shouldKeep = wasSynced ? isLocal && isRemote : isLocal || isRemote;
+						if (shouldKeep) nextIds.add(id);
+					});
+				}
+
+				const reconciledQueue = localQueue.filter((anime) => nextIds.has(anime.id));
+				const reconciledIds = new Set(reconciledQueue.map((anime) => anime.id));
+				remoteQueue.forEach((anime) => {
+					if (!nextIds.has(anime.id) || reconciledIds.has(anime.id)) return;
+					reconciledQueue.push(anime);
+					reconciledIds.add(anime.id);
+				});
+
+				const importedFromAniList = reconciledQueue.filter((anime) => !localIds.has(anime.id)).length;
+				const removedFromSeanime = localQueue.filter((anime) => !reconciledIds.has(anime.id)).length;
+				if (!sameQueueOrder(localQueue, reconciledQueue)) {
+					orderedList.set(reconciledQueue);
+					saveListToStorage(reconciledQueue);
+					refreshAvailableAnime();
+					sendSnapshot();
+				}
+
+				const queuedIds = new Set(reconciledQueue.map((anime) => Number(anime.id)));
 				let added = 0;
 				let removed = 0;
 				let created = 0;
@@ -653,7 +757,7 @@ function init() {
 
 					const entry = byMediaId.get(mediaId);
 					const currentLists = currentCustomListsForMedia(mediaId, entry);
-					const nextLists = currentLists.filter((name) => name !== aniListCustomListName);
+					const nextLists = currentLists.filter((name) => !isWatchNextList(name));
 					if (sameStringList(currentLists, nextLists)) continue;
 
 					await saveAniListEntryCustomLists(mediaId, nextLists);
@@ -661,7 +765,7 @@ function init() {
 					removed++;
 				}
 
-				const orderedQueue = orderedList.get().filter((anime) => Number(anime.id) > 0);
+				const orderedQueue = reconciledQueue.filter((anime) => Number(anime.id) > 0);
 				for (let index = orderedQueue.length - 1; index >= 0; index--) {
 					const mediaId = Number(orderedQueue[index]?.id || 0);
 					if (!mediaId) continue;
@@ -670,7 +774,7 @@ function init() {
 
 					const entry = byMediaId.get(mediaId);
 					const currentLists = currentCustomListsForMedia(mediaId, entry);
-					const hasWatchNext = existingWatchNextIds.has(mediaId) || currentLists.some((name) => name === aniListCustomListName);
+					const hasWatchNext = existingWatchNextIds.has(mediaId) || currentLists.some((name) => isWatchNextList(name));
 					const nextLists = uniqueStringList([...currentLists, aniListCustomListName]);
 
 					aniListSyncStatus.set("Ordering AniList Watch Next " + progress + "/" + orderedQueue.length + "...");
@@ -689,13 +793,14 @@ function init() {
 					ordered++;
 				}
 
-				const message = madeListVisible || added || created || removed || ordered
-					? "AniList list '" + aniListCustomListName + "' synced. Created " + created + ", added " + added + ", removed " + removed + ", ordered " + ordered + ". Refresh AniList if it is already open."
+				saveLastSyncedList(orderedQueue);
+				const message = madeListVisible || importedFromAniList || removedFromSeanime || added || created || removed || ordered
+					? "Watch Next synced both ways. Imported " + importedFromAniList + " from AniList, removed " + removedFromSeanime + " from Seanime, created " + created + ", added " + added + ", removed " + removed + ", ordered " + ordered + " on AniList."
 					: "AniList list '" + aniListCustomListName + "' is already up to date. Refresh AniList if it is already open.";
 				aniListSyncStatus.set(message);
 				ctx.toast.success(message);
 			} catch (error: any) {
-				const message = error?.message || "Failed to sync Watch Next to AniList.";
+				const message = error?.message || "Failed to sync Watch Next with AniList.";
 				aniListSyncStatus.set(message);
 				ctx.toast.error(message);
 			} finally {
@@ -705,34 +810,38 @@ function init() {
 		}
 
 		$store.watch<$app.AL_AnimeCollection>("watch-next-kolex06.latestAnimeCollection", (newCollection) => {
-			if (!autoRemoveSetting || !newCollection?.MediaListCollection?.lists) return;
+			if (!newCollection?.MediaListCollection?.lists) return;
 
 			const currentIds = new Set<number>();
-			newCollection.MediaListCollection.lists.forEach((list: any) => {
-				if ($toString(list.status) !== "CURRENT") return;
-				(list.entries || []).forEach((entry: any) => {
-					if (entry?.media?.id) currentIds.add(Number(entry.media.id));
+			if (autoRemoveSetting) {
+				newCollection.MediaListCollection.lists.forEach((list: any) => {
+					if ($toString(list.status) !== "CURRENT") return;
+					(list.entries || []).forEach((entry: any) => {
+						if (entry?.media?.id) currentIds.add(Number(entry.media.id));
+					});
 				});
-			});
 
-			if (!currentIds.size) return;
+				if (currentIds.size) {
+					const current = orderedList.get();
+					const next = current.filter((anime) => !currentIds.has(anime.id));
+					if (next.length !== current.length) {
+						orderedList.set(next);
+						saveListToStorage(next);
+						refreshAvailableAnime();
+						ctx.toast.info("Removed anime that moved to your CURRENT list.");
+						sendSnapshot();
+					}
+				}
+			}
 
-			const current = orderedList.get();
-			const next = current.filter((anime) => !currentIds.has(anime.id));
-			if (next.length === current.length) return;
-
-			orderedList.set(next);
-			saveListToStorage(next);
-			refreshAvailableAnime();
-			ctx.toast.info("Removed anime that moved to your CURRENT list.");
-			sendSnapshot();
-			scheduleAniListAutoSync("auto-remove");
+			if (autoSyncAniListSetting) scheduleAniListAutoSync("AniList refresh");
 		});
 
 		webview.channel.on("hydrate", () => {
 			loadDataFromStorage();
 			refreshAvailableAnime();
 			sendSnapshot();
+			if (autoSyncAniListSetting) scheduleAniListAutoSync("opening Watch Next");
 		});
 
 		webview.channel.on("open-add-view", () => {
@@ -1629,10 +1738,10 @@ function init() {
 							actions.appendChild(button(state.isSyncingAniList ? "Syncing AniList" : "Sync AniList List", "btn-plain", function() {
 								if (state.isSyncingAniList) return;
 								state.isSyncingAniList = true;
-								state.aniListSyncStatus = "Syncing Watch Next to AniList...";
+								state.aniListSyncStatus = "Syncing Watch Next with AniList...";
 								render();
 								send("sync-anilist-list");
-							}, "Sync queue membership to an AniList custom list named Watch Next"));
+							}, "Sync queue membership with the AniList custom list named Watch Next"));
 
 							if (state.currentView === "main") {
 								actions.appendChild(button("Add Anime", "btn-primary", function() {

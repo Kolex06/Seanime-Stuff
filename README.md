@@ -21,7 +21,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 | SeaUtils Kolex06-Version | 1.2.74 | `SeaUtils-Kolex06-Version` | Utility plugin for Seanime UI improvements, marketplace/full catalog controls, carousels, sub/dub badges, update highlighting, and tray preferences. |
 | AniList Notifications Kolex06-Version | 1.0.17 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
 | Account Switcher Kolex06-Version | 1.0.10 | `Account-Switcher-Kolex06-Version` | AniList account switcher moved from the tray into Seanime's avatar dropdown menu. |
-| Watch Next Kolex06-Version | 1.0.6 | `Watch-Next-Kolex06-Version` | Kolex06-styled sidebar Watch Next queue with AniList imports, drag-handle anime ordering, and automatic AniList custom-list sync in queue order. |
+| Watch Next Kolex06-Version | 1.0.7 | `Watch-Next-Kolex06-Version` | Kolex06-styled sidebar Watch Next queue with drag-handle anime ordering and two-way AniList Watch Next sync. |
 | AsunaTracks Sync | 0.1.22 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
@@ -150,14 +150,53 @@ Features include:
 - Search, list, year, season, and added-time filters.
 - Drag-handle queue ordering.
 - Up/down buttons for keyboard or fallback ordering.
-- Auto-sync queued anime into an AniList custom list named Watch Next in queue order.
+- Sync Watch Next membership in both directions while preserving the Seanime queue order on AniList.
 - Uses AniList priority updates so already-listed anime are reordered too.
 - Open and Remove row actions use compact icon buttons with hover labels.
 - AniList writes are spaced out to reduce 429 Too Many Requests.
 - If AniList still returns 429, the plugin waits and retries once instead of instantly failing.
-- Manual Sync AniList List button for forcing a refresh.
+- The existing Sync AniList List button and Auto-sync AniList setting sync Watch Next membership in both directions.
 - Optional auto-remove when queued anime moves to CURRENT.
 - Migration from the original Watch Next storage keys on first load.
+
+### Version History
+
+#### 1.0.7
+
+- Added two-way Watch Next sync: selecting or removing Watch Next on AniList now updates the Seanime queue during sync.
+- Auto-sync checks AniList when Watch Next opens and when Seanime refreshes the AniList collection.
+
+#### 1.0.6
+
+- Fixed Auto-remove CURRENT and Auto-sync AniList toggle-off events by sending and reading explicit `enabled` values.
+- Replaced the toggle checkboxes with controlled toggle buttons and uses saved setting values as the source of truth.
+
+#### 1.0.5
+
+- Swapped the Move down and Open anime row action positions.
+
+#### 1.0.4
+
+- Changed the Watch Next row Open and Remove actions to compact icon buttons with hover labels.
+
+#### 1.0.3
+
+- Restored the `1.0.1` full AniList order sync behavior so manual sync and auto-sync both rewrite the queue order.
+- AniList writes are spaced out to reduce 429 Too Many Requests.
+- If AniList still returns 429, the plugin waits and retries once instead of instantly failing.
+
+#### 1.0.2
+
+- AniList writes are spaced out to reduce 429 Too Many Requests.
+- If AniList still returns 429, the plugin waits and retries once instead of instantly failing.
+
+#### 1.0.1
+
+- Fixed Seanime webview drag ordering with a dedicated drag handle and pointer-based reorder logic.
+
+#### 1.0.0
+
+- Initial GitHub release of Watch Next Kolex06-Version.
 
 Direct manifest:
 
