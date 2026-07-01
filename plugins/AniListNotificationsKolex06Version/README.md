@@ -18,6 +18,9 @@ AniList Notifications Kolex06-Version adds a Seanime sidebar page for your AniLi
 
 ## Version History
 
+### 1.0.18
+- Separates the top-right popup close button from the clickable notification area so the X only closes the popup.
+
 ### 1.0.17
 - Makes the top-right notification popup close button visibly change on hover, focus, and click without opening the notifications page.
 

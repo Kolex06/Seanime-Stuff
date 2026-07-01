@@ -616,23 +616,12 @@ function init() {
 		}
 
 		async function ensureGlobalNotificationPopup() {
-			let suppressGlobalPopupOpenUntil = 0;
-			const claimClosePopupClick = (event: any) => {
-				suppressGlobalPopupOpenUntil = Date.now() + 800;
+			const stopClosePopupEvent = (event: any, preventDefault = false) => {
 				try {
-					event?.preventDefault?.();
+					if (preventDefault) event?.preventDefault?.();
 					event?.stopPropagation?.();
 					event?.stopImmediatePropagation?.();
 				} catch (_) {}
-			};
-			const isClosePopupClick = (event: any) => {
-				if (Date.now() < suppressGlobalPopupOpenUntil) return true;
-				try {
-					const target = event?.target;
-					return !!(target && target.closest && target.closest('[data-anilist-notifications-global-close="true"]'));
-				} catch (_) {
-					return false;
-				}
 			};
 			let root = await ctx.dom.queryOne('[data-anilist-notifications-global-popup="true"]');
 			if (root) return root;
@@ -656,8 +645,6 @@ function init() {
 			].join(";"));
 
 			const card = await ctx.dom.createElement("div");
-			card.setAttribute("role", "button");
-			card.setAttribute("tabindex", "0");
 			card.setAttribute("data-anilist-notifications-global-card", "true");
 			card.setCssText([
 				"appearance:none",
@@ -665,7 +652,7 @@ function init() {
 				"width:100%",
 				"min-height:112px",
 				"display:grid",
-				"grid-template-columns:48px minmax(0,1fr) 30px",
+				"grid-template-columns:minmax(0,1fr) 30px",
 				"gap:12px",
 				"align-items:start",
 				"padding:13px",
@@ -676,18 +663,23 @@ function init() {
 				"color:#f8fafc",
 				"font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
 				"text-align:left",
-				"cursor:pointer",
 				"backdrop-filter:blur(16px)",
 			].join(";"));
-			card.addEventListener("click", (event: any) => {
-				if (isClosePopupClick(event)) {
-					claimClosePopupClick(event);
-					return;
-				}
-				openGlobalNotificationPopup();
-			});
-			card.addEventListener("keydown", (event: any) => {
-				if (isClosePopupClick(event)) return;
+
+			const openArea = await ctx.dom.createElement("div");
+			openArea.setAttribute("role", "button");
+			openArea.setAttribute("tabindex", "0");
+			openArea.setAttribute("data-anilist-notifications-global-open", "true");
+			openArea.setCssText([
+				"min-width:0",
+				"display:grid",
+				"grid-template-columns:48px minmax(0,1fr)",
+				"gap:12px",
+				"align-items:start",
+				"cursor:pointer",
+			].join(";"));
+			openArea.addEventListener("click", openGlobalNotificationPopup);
+			openArea.addEventListener("keydown", (event: any) => {
 				const key = String(event?.key || "");
 				if (key !== "Enter" && key !== " ") return;
 				try {
@@ -768,29 +760,32 @@ function init() {
 			close.addEventListener("mouseleave", () => setCloseStyle("idle"));
 			close.addEventListener("focus", () => setCloseStyle("hover"));
 			close.addEventListener("blur", () => setCloseStyle("idle"));
-			close.addEventListener("pointerdown", claimClosePopupClick);
+			close.addEventListener("pointerdown", (event: any) => {
+				stopClosePopupEvent(event);
+				setCloseStyle("active");
+			});
 			close.addEventListener("pointerup", (event: any) => {
-				claimClosePopupClick(event);
+				stopClosePopupEvent(event, true);
 				setCloseStyle("hover");
 				void hideGlobalNotificationPopup();
 			});
 			close.addEventListener("mousedown", (event: any) => {
-				claimClosePopupClick(event);
+				stopClosePopupEvent(event);
 				setCloseStyle("active");
 			});
 			close.addEventListener("mouseup", (event: any) => {
-				claimClosePopupClick(event);
+				stopClosePopupEvent(event, true);
 				setCloseStyle("hover");
 				void hideGlobalNotificationPopup();
 			});
 			close.addEventListener("keydown", (event: any) => {
 				const key = String(event?.key || "");
 				if (key !== "Enter" && key !== " ") return;
-				claimClosePopupClick(event);
+				stopClosePopupEvent(event, true);
 				void hideGlobalNotificationPopup();
 			});
 			close.addEventListener("click", (event: any) => {
-				claimClosePopupClick(event);
+				stopClosePopupEvent(event, true);
 				void hideGlobalNotificationPopup();
 			});
 
@@ -798,8 +793,9 @@ function init() {
 			copy.append(title);
 			copy.append(text);
 			copy.append(more);
-			card.append(image);
-			card.append(copy);
+			openArea.append(image);
+			openArea.append(copy);
+			card.append(openArea);
 			card.append(close);
 			root.append(card);
 			body.append(root);
