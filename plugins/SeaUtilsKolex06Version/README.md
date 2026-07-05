@@ -2,7 +2,7 @@
 
 SeaUtils Kolex06-Version is a Seanime utility extension by Kolex06. It improves the Extensions marketplace, adds better catalog popups, gives media grids optional carousel behavior, and adds small quality-of-life badges for anime cards.
 
-Version `1.2.74` improves Schedule DUB badges with AsunaTracks schedule data.
+Version `1.2.75` improves Schedule DUB rows and Bas1874 marketplace URL handling.
 
 ## Features
 
@@ -62,10 +62,18 @@ Virus scan metadata is informational only. You should still review extensions yo
 
 ## Version History
 
+### 1.2.75
+- Keeps same-time SUB and DUB Schedule entries as separate rows.
+- Prevents stale fallback DUB rows from creating future DUB entries when AsunaTracks no longer has that DUB date.
+- Shows Schedule DUB titles with an icon-only microphone prefix.
+- Preserves a user's custom marketplace URL when toggling the Bas1874 marketplace option.
+- Re-applies the Bas1874 marketplace URL after refresh without overwriting unrelated custom URLs.
+- Hides Seanime's native disabled Installed button when SeaUtils action icons are shown on marketplace cards.
+
 ### 1.2.74
 - Uses the public AsunaTracks Schedule API for Schedule DUB badges.
 - Supports Schedule desktop and mobile/list cards.
-- use MyDubList for regular anime-card DUB badges outside Schedule
+- Uses MyDubList for regular anime-card DUB badges outside Schedule.
 - Keeps older fallback DUB data for past Schedule entries.
 
 ### 1.2.73

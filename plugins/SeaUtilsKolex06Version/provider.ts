@@ -17,6 +17,109 @@ interface AmaSettings {
 }
 
 function init() {
+    const mergeDubScheduleItems = (e: any) => {
+        try {
+            const originalItems = (e.items || []).filter((item: any) => {
+                const title = String(item && item.title || "")
+                return !(item && item.isAmaDubSchedule === true) && !title.startsWith("[AMA_DUB] ") && !title.startsWith("\u2063")
+            })
+            const dubbedItems = $store.get("dub-schedule-items") || []
+            const combined = new Map<string, any>()
+            const originalSameTimeKeys = new Set<string>()
+            const originalByMediaEpisode = new Map<string, any>()
+
+            const getMediaEpisodeKey = (item: any) => {
+                const mediaId = String(item && (item.mediaId || item.id || "") || "")
+                const episodeValue = item && (item.amaDubEpisodeNumber || item.episodeNumber || "")
+                const episodeNumber = Number(episodeValue)
+
+                return mediaId + "-" + (Number.isFinite(episodeNumber) && episodeNumber > 0 ? String(episodeNumber) : String(episodeValue || ""))
+            }
+
+            const getItemTime = (item: any) => {
+                const date = item && item.dateTime ? new Date(item.dateTime) : null
+
+                return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0
+            }
+
+            const getScheduleSlotKey = (item: any) => {
+                const mediaId = String(item && (item.mediaId || item.id || "") || "")
+                const episodeNumber = String(item && item.episodeNumber || "")
+                const date = item && item.dateTime ? new Date(item.dateTime) : null
+                const dateTime = date && !Number.isNaN(date.getTime()) ? String(date.getTime()) : String(item && item.dateTime || "")
+
+                return mediaId + "-" + episodeNumber + "-" + dateTime
+            }
+
+            const keepDubFromBeatingFutureSub = (item: any) => {
+                const original = originalByMediaEpisode.get(getMediaEpisodeKey(item))
+                if (!original) return item
+
+                const originalTime = getItemTime(original)
+                const dubTime = getItemTime(item)
+                if (!originalTime || !dubTime || dubTime >= originalTime) return item
+                if (item && item.amaDubScheduleSource === "asunatracks") return item
+
+                return null
+            }
+
+            const separateSameTimeDubItem = (item: any) => {
+                const slotKey = getScheduleSlotKey(item)
+                if (!originalSameTimeKeys.has(slotKey)) return item
+
+                const date = item && item.dateTime ? new Date(item.dateTime) : null
+                if (!date || Number.isNaN(date.getTime())) return item
+
+                return {
+                    ...item,
+                    dateTime: new Date(date.getTime() + 1).toISOString(),
+                }
+            }
+
+            originalItems.forEach((item: any) => {
+                originalSameTimeKeys.add(getScheduleSlotKey(item))
+                const mediaEpisodeKey = getMediaEpisodeKey(item)
+                const existing = originalByMediaEpisode.get(mediaEpisodeKey)
+
+                if (mediaEpisodeKey && (!existing || getItemTime(item) < getItemTime(existing))) {
+                    originalByMediaEpisode.set(mediaEpisodeKey, item)
+                }
+
+                combined.set(String(item.mediaId || item.id || item.title || "") + "-" + String(item.episodeNumber || "") + "-sub", item)
+            })
+
+            dubbedItems.forEach((item: any) => {
+                const guardedDubItem = keepDubFromBeatingFutureSub(item)
+                if (!guardedDubItem) return
+
+                const dubItem = separateSameTimeDubItem(guardedDubItem)
+                combined.set(String(dubItem.mediaId || dubItem.id || dubItem.title || "") + "-" + String(dubItem.episodeNumber || "") + "-dub", dubItem)
+            })
+
+            e.items = Array.from(combined.values()).sort((a: any, b: any) => {
+                const dateA = a && a.dateTime ? new Date(a.dateTime).getTime() : 0
+                const dateB = b && b.dateTime ? new Date(b.dateTime).getTime() : 0
+                return dateA - dateB
+            })
+        } catch (error) {
+            console.error("SeaUtils DUB Schedule Hook Error:", error)
+        } finally {
+            e.next()
+        }
+    }
+
+    try {
+        const appApi: any = $app
+        if (appApi && typeof appApi.onAnimeScheduleItems === "function") {
+            appApi.onAnimeScheduleItems(mergeDubScheduleItems)
+        }
+        if (appApi && typeof appApi.onMediaScheduleItems === "function") {
+            appApi.onMediaScheduleItems(mergeDubScheduleItems)
+        }
+    } catch (error) {
+        console.error("SeaUtils DUB Schedule Hook Register Error:", error)
+    }
+
     $ui.register(function(ctx) {
 
         const SETTINGS_KEY = "ama-ui-tweaks.settings"
@@ -252,6 +355,320 @@ function init() {
         })
 
         const initialFeatureSettings = settingsState.get()
+
+        function getLocalTimezone(): string {
+            try {
+                return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Oslo"
+            } catch (_) {
+                return "Europe/Oslo"
+            }
+        }
+
+        function getIsoWeekInfo(date: Date): { year: number, week: number } {
+            const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+            const day = utc.getUTCDay() || 7
+            utc.setUTCDate(utc.getUTCDate() + 4 - day)
+            const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1))
+            const week = Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+            return { year: utc.getUTCFullYear(), week }
+        }
+
+        function addWeeks(date: Date, weeks: number): Date {
+            const next = new Date(date.getTime())
+            next.setDate(next.getDate() + weeks * 7)
+            return next
+        }
+
+        function findAnimeInCollection(mediaId: any, animeCollection: any) {
+            if (!animeCollection || !animeCollection.MediaListCollection || !Array.isArray(animeCollection.MediaListCollection.lists)) return null
+            const targetId = String(mediaId || "")
+            if (!targetId) return null
+
+            for (const list of animeCollection.MediaListCollection.lists) {
+                const entries = list && Array.isArray(list.entries) ? list.entries : []
+                for (const entry of entries) {
+                    const media = entry && entry.media ? entry.media : null
+                    if (media && String(media.id) === targetId) return media
+                }
+            }
+
+            return null
+        }
+
+        function getDubScheduleMediaId(item: any) {
+            return item && (
+                item.media && item.media.media && item.media.media.id ||
+                item.media && item.media.id ||
+                item.mediaId ||
+                item.media_id ||
+                item.id
+            )
+        }
+
+        function getDubScheduleMedia(item: any, fallbackItem: any) {
+            return item && item.media && item.media.media ||
+                item && item.media ||
+                fallbackItem && fallbackItem.media && fallbackItem.media.media ||
+                fallbackItem && fallbackItem.media ||
+                {}
+        }
+
+        function getDubScheduleTitle(item: any, fallbackItem: any) {
+            const media = getDubScheduleMedia(item, fallbackItem)
+            const title = media && media.title || {}
+
+            return String(
+                title.userPreferred ||
+                title.english ||
+                title.romaji ||
+                item && (item.english || item.title || item.romaji || item.native) ||
+                fallbackItem && (fallbackItem.english || fallbackItem.title || fallbackItem.romaji || fallbackItem.native) ||
+                ""
+            ).trim()
+        }
+
+        function getDubScheduleImage(item: any, fallbackItem: any) {
+            const media = getDubScheduleMedia(item, fallbackItem)
+            const coverImage = media && media.coverImage || {}
+
+            return coverImage.extraLarge ||
+                coverImage.large ||
+                coverImage.medium ||
+                item && item.image ||
+                fallbackItem && fallbackItem.image ||
+                ""
+        }
+
+        function getDubScheduleFormat(item: any, fallbackItem: any) {
+            const media = getDubScheduleMedia(item, fallbackItem)
+            return media && media.format || item && item.format || fallbackItem && fallbackItem.format || ""
+        }
+
+        function getDubScheduleTotalEpisodes(item: any, fallbackItem: any) {
+            const media = getDubScheduleMedia(item, fallbackItem)
+            return Number(item && item.episodes || media && media.episodes || fallbackItem && fallbackItem.episodes || 0)
+        }
+
+        const ASUNATRACKS_FUTURE_DUB_CACHE_KEY = "ama-ui-tweaks.futureDubSchedule.cache.v2"
+        const ASUNATRACKS_FUTURE_DUB_LOCK_KEY = "ama-ui-tweaks.futureDubSchedule.lock.v1"
+        const ASUNATRACKS_FUTURE_DUB_CACHE_TTL = 1000 * 60 * 60 * 6
+        const ASUNATRACKS_FUTURE_DUB_LOCK_TTL = 1000 * 60 * 2
+
+        function getStorageObject(key: string): any {
+            try {
+                const storage = getStorageApi()
+                if (storage && typeof storage.get === "function") return storage.get<any>(key)
+            } catch (_) {}
+
+            return null
+        }
+
+        function setStorageObject(key: string, value: any) {
+            try {
+                const storage = getStorageApi()
+                if (storage && typeof storage.set === "function") storage.set(key, value)
+            } catch (_) {}
+        }
+
+        function getCachedAsunaTracksFutureDubSchedule(): any[] {
+            const cached = getStorageObject(ASUNATRACKS_FUTURE_DUB_CACHE_KEY)
+            if (!cached || typeof cached !== "object") return []
+            if (!Array.isArray(cached.items)) return []
+            if (!cached.time || Date.now() - Number(cached.time) > ASUNATRACKS_FUTURE_DUB_CACHE_TTL) return []
+            return cached.items
+        }
+
+        function setCachedAsunaTracksFutureDubSchedule(items: any[]) {
+            setStorageObject(ASUNATRACKS_FUTURE_DUB_CACHE_KEY, {
+                time: Date.now(),
+                items,
+            })
+        }
+
+        function acquireAsunaTracksFutureDubLock(): boolean {
+            const lockedAt = Number(getStorageObject(ASUNATRACKS_FUTURE_DUB_LOCK_KEY) || 0)
+            if (lockedAt && Date.now() - lockedAt < ASUNATRACKS_FUTURE_DUB_LOCK_TTL) return false
+
+            setStorageObject(ASUNATRACKS_FUTURE_DUB_LOCK_KEY, Date.now())
+            return true
+        }
+
+        function getAsunaTracksAnilistId(item: any) {
+            return item && (
+                item.external_ids && item.external_ids.anilist ||
+                item.externalIds && item.externalIds.anilist ||
+                item.media && item.media.external_ids && item.media.external_ids.anilist ||
+                item.media && item.media.externalIds && item.media.externalIds.anilist ||
+                item.anilist_id ||
+                item.anilistId
+            )
+        }
+
+        async function loadAsunaTracksFutureDubSchedule(): Promise<any[]> {
+            const cachedEntry = getStorageObject(ASUNATRACKS_FUTURE_DUB_CACHE_KEY)
+            if (
+                cachedEntry &&
+                typeof cachedEntry === "object" &&
+                Array.isArray(cachedEntry.items) &&
+                cachedEntry.time &&
+                Date.now() - Number(cachedEntry.time) <= ASUNATRACKS_FUTURE_DUB_CACHE_TTL
+            ) {
+                return cachedEntry.items
+            }
+
+            if (!acquireAsunaTracksFutureDubLock()) return []
+
+            const timezone = encodeURIComponent(getLocalTimezone())
+            const start = new Date()
+            const weeks = Array.from({ length: 10 }, (_, index) => getIsoWeekInfo(addWeeks(start, index)))
+            const seenWeeks = new Set<string>()
+            const uniqueWeeks = weeks.filter(week => {
+                const key = week.year + "-" + week.week
+                if (seenWeeks.has(key)) return false
+                seenWeeks.add(key)
+                return true
+            })
+
+            const items: any[] = []
+            let consecutiveFailures = 0
+
+            for (const week of uniqueWeeks) {
+                try {
+                    const response = await ctx.fetch(
+                        "https://asunatracks.space/public/api/anime-schedule?type=dub&year=" +
+                        encodeURIComponent(String(week.year)) +
+                        "&week=" +
+                        encodeURIComponent(String(week.week)) +
+                        "&tz=" +
+                        timezone,
+                        {
+                            timeout: 8,
+                        }
+                    )
+
+                    if (!response.ok) {
+                        consecutiveFailures += 1
+                        if (consecutiveFailures >= 2) break
+                        continue
+                    }
+
+                    consecutiveFailures = 0
+                    const data = response.json()
+                    const weekItems = data && Array.isArray(data.items) ? data.items : []
+
+                    weekItems.forEach((item: any) => {
+                        const anilistId = getAsunaTracksAnilistId(item)
+                        if (!anilistId) return
+
+                        items.push({
+                            title: item && item.title,
+                            episodeDate: item && (item.episode_date || item.episodeDate),
+                            episodeNumber: item && (item.episode_number || item.episodeNumber),
+                            amaDubScheduleSource: "asunatracks",
+                            media: {
+                                media: {
+                                    id: anilistId,
+                                },
+                            },
+                        })
+                    })
+                } catch (_) {
+                    consecutiveFailures += 1
+                    if (consecutiveFailures >= 2) break
+                }
+            }
+
+            setCachedAsunaTracksFutureDubSchedule(items)
+            return items
+        }
+
+        function buildDubScheduleItems(dubSchedule: any[], metadataById: Record<string, any>): any[] {
+            const allDubbedItems: any[] = []
+            const uniqueEntries = new Set<string>()
+
+            for (const dubItem of dubSchedule) {
+                const mediaId = getDubScheduleMediaId(dubItem)
+                const fallbackItem = metadataById[String(mediaId || "")] || {}
+                const episodeNumber = Number(dubItem && dubItem.episodeNumber || 0)
+                const episodeDateText = String(dubItem && dubItem.episodeDate || "")
+                const airingDate = new Date(episodeDateText)
+                const uniqueKey = String(mediaId || "") + "-" + String(episodeNumber || "")
+                const title = getDubScheduleTitle(dubItem, fallbackItem)
+
+                if (!mediaId || !episodeNumber || !title || Number.isNaN(airingDate.getTime()) || uniqueEntries.has(uniqueKey)) continue
+                uniqueEntries.add(uniqueKey)
+
+                const totalEpisodes = getDubScheduleTotalEpisodes(dubItem, fallbackItem)
+
+                allDubbedItems.push({
+                    mediaId,
+                    title: "\u2063\uD83C\uDF99\uFE0F " + title,
+                    time: airingDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
+                    dateTime: airingDate.toISOString(),
+                    image: getDubScheduleImage(dubItem, fallbackItem),
+                    episodeNumber,
+                    amaDubEpisodeNumber: episodeNumber,
+                    isMovie: getDubScheduleFormat(dubItem, fallbackItem) === "MOVIE",
+                    isSeasonFinale: totalEpisodes > 0 && episodeNumber === totalEpisodes,
+                    isAmaDubSchedule: true,
+                })
+            }
+
+            return allDubbedItems
+        }
+
+        async function fetchAndProcessDubSchedule() {
+            try {
+                const currentScheduleResponse = await ctx.fetch("https://raw.githubusercontent.com/Bas1874/AniSchedule/refs/heads/master/raw/dub-schedule.json")
+                const pastFeedResponse = await ctx.fetch("https://raw.githubusercontent.com/Bas1874/AniSchedule/refs/heads/master/raw/dub-episode-feed.json")
+
+                if (!currentScheduleResponse.ok || !pastFeedResponse.ok) {
+                    console.error("SeaUtils DUB Schedule: failed to fetch DUB data")
+                    return
+                }
+
+                const currentDubSchedule = currentScheduleResponse.json()
+                const pastDubFeed = pastFeedResponse.json()
+                const metadataById: Record<string, any> = {}
+
+                ;(Array.isArray(currentDubSchedule) ? currentDubSchedule : []).forEach((item: any) => {
+                    const mediaId = getDubScheduleMediaId(item)
+                    if (mediaId) metadataById[String(mediaId)] = item
+                })
+
+                const transformedPastSchedule = (Array.isArray(pastDubFeed) ? pastDubFeed : []).map(item => ({
+                    episodeDate: item && item.episode && item.episode.airedAt,
+                    episodeNumber: item && item.episode && item.episode.aired,
+                    media: {
+                        media: {
+                            id: item && item.id,
+                        },
+                    },
+                }))
+                const baseDubSchedule = (Array.isArray(currentDubSchedule) ? currentDubSchedule : []).concat(transformedPastSchedule)
+                const cachedFutureSchedule = getCachedAsunaTracksFutureDubSchedule()
+                const dubSchedule = cachedFutureSchedule.concat(baseDubSchedule)
+                const allDubbedItems = buildDubScheduleItems(dubSchedule, metadataById)
+
+                $store.set("dub-schedule-items", allDubbedItems)
+                $app.invalidateClientQuery(["GetAnimeSchedule"])
+
+                loadAsunaTracksFutureDubSchedule().then(futureSchedule => {
+                    if (!Array.isArray(futureSchedule) || !futureSchedule.length) return
+
+                    const mergedDubSchedule = futureSchedule.concat(baseDubSchedule)
+                    const mergedDubbedItems = buildDubScheduleItems(mergedDubSchedule, metadataById)
+
+                    $store.set("dub-schedule-items", mergedDubbedItems)
+                    $app.invalidateClientQuery(["GetAnimeSchedule"])
+                }).catch(() => {})
+            } catch (error) {
+                console.error("SeaUtils DUB Schedule UI Error:", error)
+            }
+        }
+
+        fetchAndProcessDubSchedule()
+        ctx.setInterval(fetchAndProcessDubSchedule, 30 * 60 * 1000)
 
         const SCHEDULE_EVENT_QUERY = '[data-schedule-calendar-event-item-link], [data-schedule-calendar-event-item-content], [data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-episode], [data-schedule-calendar-event-item-finale-icon], [data-schedule-calendar-event-item], [data-schedule-event-item], [data-schedule-media-id]'
         const SERVER_SCHEDULE_EVENT_QUERY = '[data-schedule-calendar-event-item-link], [data-schedule-calendar-event-item-content], [data-schedule-calendar-event-item-name], [data-schedule-calendar-event-item-episode], [data-schedule-calendar-event-item-finale-icon], [data-schedule-calendar-event-item], [data-schedule-calendar-event-item-root], [data-schedule-event-item], [data-schedule-media-id]'
@@ -1081,6 +1498,24 @@ function init() {
                 vertical-align: middle !important;
                 flex: 0 0 auto !important;
                 min-width: 28px !important;
+            }
+
+            body[data-ama-subdub-icons="true"] [data-ama-dub-schedule-episode-label="true"] {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: 20px !important;
+                min-width: 52px !important;
+                padding: 0 7px !important;
+                border-radius: 999px !important;
+                border: 1px solid rgba(255, 183, 197, 0.7) !important;
+                color: #ffb7c5 !important;
+                background: rgba(255, 183, 197, 0.13) !important;
+                box-shadow: 0 0 10px rgba(255, 183, 197, 0.12) !important;
+                font-size: 11px !important;
+                font-weight: 800 !important;
+                line-height: 1 !important;
+                white-space: nowrap !important;
             }
 
             body[data-ama-subdub-icons="false"] .ama-media-badges {
@@ -3865,41 +4300,97 @@ function init() {
                         });
                     }
 
-                    function enhanceScheduleEvent(root) {
-                        if (!featureSettings.subDubIcons) {
-                            removeScheduleDubBadges(root);
-                            return;
+                    function normalizeDubScheduleEpisodeLabels(root) {
+                        const scope = root && root.querySelectorAll ? root : document;
+                        if (!scope || !scope.querySelectorAll) return;
+
+                        const eventSelectors = [
+                            '[data-schedule-calendar-event-item-link]',
+                            '[data-schedule-calendar-mobile-list-day-item-event-link]',
+                            '[data-schedule-calendar-event-list-item-more-link]'
+                        ].join(',');
+
+                        const events = [];
+                        if (scope.matches && scope.matches(eventSelectors)) {
+                            events.push(scope);
+                        }
+                        scope.querySelectorAll(eventSelectors).forEach(event => events.push(event));
+
+                        function getDubEpisodeLabelText(value) {
+                            const text = String(value || '').trim();
+                            const dubMatch = text.match(/^DUB\s+Ep\\.?\\s*(\\d+(?:\\.\\d+)?)/i);
+                            if (dubMatch && dubMatch[1]) return 'DUB Ep. ' + dubMatch[1];
+
+                            const episodeMatch = text.match(/^(?:Episode|Ep\\.?)\\s*(\\d+(?:\\.\\d+)?)/i);
+                            if (episodeMatch && episodeMatch[1]) return 'DUB Ep. ' + episodeMatch[1];
+
+                            return text.replace(/^(Episode|Ep\\.)\\s+/i, 'DUB Ep. ');
                         }
 
-                        const event = getScheduleEventElement(root);
-                        if (!event || !event.querySelector) return;
-                        if (!isInsideScheduleArea(event)) return;
-                        if (event.dataset.amaScheduleDubEnhanced === "true") return;
+                        function applyDubEpisodeLabel(node) {
+                            if (!node) return;
 
-                        const anchor = getScheduleBadgeAnchor(event);
-                        if (!anchor) return;
+                            const labelText = getDubEpisodeLabelText(node.textContent);
+                            if (!labelText) return;
 
-                        const badge = event.querySelector('.ama-schedule-dub-badge:not(.ama-schedule-dub-badge-server)') || createDubMediaBadge('ama-schedule-dub-badge');
-                        badge.hidden = true;
-                        badge.setAttribute('aria-hidden', 'true');
+                            const timeChild = node.querySelector && node.querySelector('[data-schedule-calendar-event-item-time], [data-schedule-calendar-mobile-list-day-item-event-time]');
 
-                        insertScheduleDubBadge(anchor, badge);
+                            if (timeChild) {
+                                node.removeAttribute('data-ama-dub-schedule-episode-label');
 
-                        event.dataset.amaScheduleDubEnhanced = "true";
+                                let labelNode = node.querySelector(':scope > [data-ama-dub-schedule-episode-label="true"]');
+                                if (!labelNode) {
+                                    labelNode = document.createElement('span');
+                                    labelNode.setAttribute('data-ama-dub-schedule-episode-label', 'true');
 
-                        getDubForScheduleEvent(event).then(details => {
-                            if (!badge.isConnected) return;
-                            if (!featureSettings.subDubIcons) return;
+                                    const episodeTextNode = Array.from(node.childNodes).find(child => {
+                                        return child.nodeType === 3 && /^(Episode|Ep\\.?|DUB\\s+Ep\\.?)\\s*/i.test(String(child.textContent || '').trim());
+                                    });
 
-                            if (details) {
-                                updateScheduleDubBadge(badge, details);
-                                badge.hidden = false;
-                                badge.setAttribute('aria-hidden', 'false');
-                            } else {
-                                badge.hidden = true;
-                                badge.setAttribute('aria-hidden', 'true');
+                                    if (episodeTextNode) {
+                                        node.insertBefore(labelNode, episodeTextNode);
+                                        episodeTextNode.remove();
+                                    } else {
+                                        node.insertBefore(labelNode, timeChild);
+                                    }
+                                }
+
+                                labelNode.textContent = labelText;
+                                return;
                             }
+
+                            node.textContent = labelText;
+                            node.setAttribute('data-ama-dub-schedule-episode-label', 'true');
+                        }
+
+                        events.forEach(event => {
+                            const titleNode = event.querySelector('[data-schedule-calendar-event-item-name], [data-schedule-calendar-mobile-list-day-item-event-text], [data-schedule-calendar-event-list-item-more-text]');
+                            const rawTitleText = String(titleNode && titleNode.textContent || '');
+                            const titleText = rawTitleText.trim();
+                            const hasLegacyTitleMarker = titleText.startsWith('[AMA_DUB] ');
+                            const hasInvisibleTitleMarker = rawTitleText.startsWith('\u2063') || titleText.startsWith('\u2063');
+                            const hasRenderedDubMarker = event.getAttribute('data-ama-dub-schedule-row') === 'true';
+                            const hasHiddenDubMarker = event.innerHTML && event.innerHTML.indexOf('isAmaDubSchedule') !== -1;
+
+                            if (!hasLegacyTitleMarker && !hasInvisibleTitleMarker && !hasRenderedDubMarker && !hasHiddenDubMarker) return;
+
+                            if (hasLegacyTitleMarker) {
+                                titleNode.textContent = titleText.replace('[AMA_DUB] ', '');
+                            } else if (hasInvisibleTitleMarker) {
+                                titleNode.textContent = rawTitleText.replace(/^\u2063+/, '');
+                            }
+
+                            event.setAttribute('data-ama-dub-schedule-row', 'true');
+
+                            event.querySelectorAll('[data-schedule-calendar-event-item-episode], [data-schedule-calendar-mobile-list-day-item-event-episode]').forEach(node => {
+                                applyDubEpisodeLabel(node);
+                            });
                         });
+                    }
+
+                    function enhanceScheduleEvent(root) {
+                        removeScheduleDubBadges(root);
+                        normalizeDubScheduleEpisodeLabels(root);
                     }
 
                     function enhanceMediaEntryCard(card) {
@@ -4055,6 +4546,12 @@ function init() {
                         if (root.querySelectorAll) {
                             root.querySelectorAll('.ama-global-catalog-bar').forEach(bar => bar.remove());
                             root.querySelectorAll('.ama-live-card-actions').forEach(actions => actions.remove());
+                            root.querySelectorAll('[data-ama-native-installed-hidden="true"]').forEach(button => {
+                                button.style.removeProperty('display');
+                                button.removeAttribute('aria-hidden');
+                                button.removeAttribute('tabindex');
+                                delete button.dataset.amaNativeInstalledHidden;
+                            });
                             root.querySelectorAll('.ama-extension-carousel').forEach(grid => {
                                 grid.classList.remove('ama-extension-carousel');
                                 grid.dataset.amaDragScrollEnhanced = "false";
@@ -5432,12 +5929,81 @@ function init() {
                         }
                     }
 
-                    function writeMarketplaceUrl(value) {
+                    const BAS1874_MARKETPLACE_APPLIED_KEY = 'ama-ui-tweaks.bas1874Marketplace.applied';
+                    const BAS1874_MARKETPLACE_PREVIOUS_URL_KEY = 'ama-ui-tweaks.bas1874Marketplace.previousUrl';
+
+                    function notifyMarketplaceUrlChanged(oldValue, newValue) {
+                        try {
+                            window.dispatchEvent(new StorageEvent('storage', {
+                                key: 'marketplace-url',
+                                oldValue: oldValue,
+                                newValue: newValue,
+                                storageArea: window.localStorage,
+                                url: window.location.href
+                            }));
+                        } catch (_) {
+                            try {
+                                window.dispatchEvent(new Event('storage'));
+                            } catch (_) {}
+                        }
+                    }
+
+                    function readBas1874MarketplaceApplied() {
+                        try {
+                            return window.localStorage.getItem(BAS1874_MARKETPLACE_APPLIED_KEY) === 'true';
+                        } catch (_) {
+                            return false;
+                        }
+                    }
+
+                    function setBas1874MarketplaceApplied(value) {
                         try {
                             if (value) {
-                                window.localStorage.setItem('marketplace-url', JSON.stringify(value));
+                                window.localStorage.setItem(BAS1874_MARKETPLACE_APPLIED_KEY, 'true');
+                            } else {
+                                window.localStorage.removeItem(BAS1874_MARKETPLACE_APPLIED_KEY);
+                            }
+                        } catch (_) {}
+                    }
+
+                    function readBas1874PreviousMarketplaceUrl() {
+                        try {
+                            const raw = window.localStorage.getItem(BAS1874_MARKETPLACE_PREVIOUS_URL_KEY);
+                            if (!raw) return '';
+
+                            try {
+                                return JSON.parse(raw) || '';
+                            } catch (_) {
+                                return raw || '';
+                            }
+                        } catch (_) {
+                            return '';
+                        }
+                    }
+
+                    function writeBas1874PreviousMarketplaceUrl(value) {
+                        try {
+                            if (value) {
+                                window.localStorage.setItem(BAS1874_MARKETPLACE_PREVIOUS_URL_KEY, JSON.stringify(value));
+                            } else {
+                                window.localStorage.removeItem(BAS1874_MARKETPLACE_PREVIOUS_URL_KEY);
+                            }
+                        } catch (_) {}
+                    }
+
+                    function writeMarketplaceUrl(value, forceNotify) {
+                        try {
+                            const oldValue = window.localStorage.getItem('marketplace-url');
+                            const newValue = value ? JSON.stringify(value) : null;
+
+                            if (value) {
+                                window.localStorage.setItem('marketplace-url', newValue);
                             } else {
                                 window.localStorage.removeItem('marketplace-url');
+                            }
+
+                            if (forceNotify || oldValue !== newValue) {
+                                notifyMarketplaceUrlChanged(oldValue, newValue);
                             }
                         } catch (_) {}
                     }
@@ -5447,18 +6013,26 @@ function init() {
 
                         if (featureSettings.useBas1874Marketplace) {
                             if (current !== BAS1874_MARKETPLACE_URL) {
-                                writeMarketplaceUrl(BAS1874_MARKETPLACE_URL);
+                                writeBas1874PreviousMarketplaceUrl(current);
+                                writeMarketplaceUrl(BAS1874_MARKETPLACE_URL, true);
                                 marketplaceExtensionsPromise = null;
                                 bas1874MarketplaceMetadataPromise = null;
+                            } else {
+                                writeMarketplaceUrl(BAS1874_MARKETPLACE_URL, true);
                             }
+
+                            setBas1874MarketplaceApplied(true);
                             return;
                         }
 
-                        if (current === BAS1874_MARKETPLACE_URL) {
-                            writeMarketplaceUrl('');
+                        if (readBas1874MarketplaceApplied() && current === BAS1874_MARKETPLACE_URL) {
+                            writeMarketplaceUrl(readBas1874PreviousMarketplaceUrl(), true);
                             marketplaceExtensionsPromise = null;
                             bas1874MarketplaceMetadataPromise = null;
                         }
+
+                        setBas1874MarketplaceApplied(false);
+                        writeBas1874PreviousMarketplaceUrl('');
                     }
 
                     function getMarketplaceEndpoint() {
@@ -6065,6 +6639,19 @@ function init() {
                         return actions.children.length ? actions : null;
                     }
 
+                    function hideNativeInstalledButton(card) {
+                        if (!card || !card.querySelectorAll) return;
+
+                        Array.from(card.querySelectorAll('button[disabled]')).forEach(button => {
+                            if (button.closest && button.closest('.ama-clone-actions, .ama-live-card-actions, .ama-modal')) return;
+
+                            button.dataset.amaNativeInstalledHidden = 'true';
+                            button.style.setProperty('display', 'none', 'important');
+                            button.setAttribute('aria-hidden', 'true');
+                            button.setAttribute('tabindex', '-1');
+                        });
+                    }
+
                     function enhanceInstalledMarketplaceCardActions(card) {
                         if (!card || !featureSettings.betterMarketplace) return;
                         if (isInstalledExtensionsView()) return;
@@ -6079,6 +6666,7 @@ function init() {
                         if (!actions) return;
 
                         actions.classList.add('ama-live-card-actions');
+                        hideNativeInstalledButton(card);
                         card.appendChild(actions);
                     }
 
@@ -6867,10 +7455,10 @@ function init() {
                         if (scheduled) return;
                         scheduled = true;
 
-                        if ('requestIdleCallback' in window) {
-                            window.requestIdleCallback(flushQueue, { timeout: 700 });
+                        if ('requestAnimationFrame' in window) {
+                            window.requestAnimationFrame(() => flushQueue());
                         } else {
-                            setTimeout(flushQueue, 220);
+                            setTimeout(flushQueue, 30);
                         }
                     }
 
@@ -6933,6 +7521,7 @@ function init() {
                         if (nextRouteKey === lastAmaRouteKey) return;
 
                         lastAmaRouteKey = nextRouteKey;
+                        applyBas1874MarketplacePreference();
                         setBodyFlags();
 
                         if (!areCarouselsEnabledForCurrentPage()) {
@@ -6942,10 +7531,36 @@ function init() {
                         scheduleRoot(document.body || document.documentElement);
                     }
 
+                    function scheduleRouteRefresh() {
+                        setTimeout(refreshForRouteChange, 25);
+                        setTimeout(refreshForRouteChange, 160);
+                    }
+
+                    try {
+                        const originalPushState = history.pushState;
+                        const originalReplaceState = history.replaceState;
+
+                        history.pushState = function() {
+                            const result = originalPushState.apply(this, arguments);
+                            scheduleRouteRefresh();
+                            return result;
+                        };
+
+                        history.replaceState = function() {
+                            const result = originalReplaceState.apply(this, arguments);
+                            scheduleRouteRefresh();
+                            return result;
+                        };
+                    } catch (_) {}
+
                     window.addEventListener('popstate', refreshForRouteChange);
                     window.addEventListener('hashchange', refreshForRouteChange);
+                    document.addEventListener('click', event => {
+                        const target = event.target && event.target.closest ? event.target.closest('a[href], button, [role="button"], [role="tab"]') : null;
+                        if (target) scheduleRouteRefresh();
+                    }, true);
                     document.addEventListener('click', handleNativeExtensionUpdateClick, true);
-                    setInterval(refreshForRouteChange, 500);
+                    setInterval(refreshForRouteChange, 250);
 
                     setBodyFlags();
                     writeBrowserSettings(featureSettings);
