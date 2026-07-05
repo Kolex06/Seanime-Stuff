@@ -2,7 +2,7 @@
 
 SeaUtils Kolex06-Version is a Seanime utility extension by Kolex06. It improves the Extensions marketplace, adds better catalog popups, gives media grids optional carousel behavior, and adds small quality-of-life badges for anime cards.
 
-Version `1.2.75` improves Schedule DUB rows, DUB episode placement, and Bas1874 marketplace URL handling.
+Version `1.2.75` improves Schedule DUB rows and Bas1874 marketplace URL handling.
 
 ## Features
 
@@ -63,8 +63,8 @@ Virus scan metadata is informational only. You should still review extensions yo
 ## Version History
 
 ### 1.2.75
-- Keeps same-time SUB and DUB Schedule entries as separate rows instead of merging DUB into the SUB row.
-- Moves `DUB Ep. **` into Seanime's normal episode position where `Ep. **` shows, instead of showing it underneath the Schedule row.
+- Shows DUB Schedule releases as their own DUB rows, with `DUB Ep. **` in Seanime's normal episode position instead of underneath the SUB row.
+- Keeps same-time SUB and DUB Schedule releases from collapsing into one row.
 - Prevents stale fallback DUB rows from creating future DUB entries when AsunaTracks no longer has that DUB date.
 - Shows Schedule DUB titles with an icon-only microphone prefix.
 - Preserves a user's custom marketplace URL when toggling the Bas1874 marketplace option.
