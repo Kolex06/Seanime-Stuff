@@ -34,6 +34,12 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.26
+
+- Read built-in player metadata from playback state, with a fallback to the playback-info getter.
+- Handled wrapped Seanime values, missing session IDs, and zero progress numbers when parsing player events.
+- Added a first update on loaded metadata and logs for successful playback saves, registered listeners, and skipped entries.
+
 ### 0.1.25
 
 - Fixed `readableLogTimestamp is not defined` by defining log helpers inside Seanime's isolated UI callback.

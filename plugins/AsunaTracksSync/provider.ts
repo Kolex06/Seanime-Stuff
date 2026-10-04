@@ -424,6 +424,7 @@ function init() {
 		const playbackIds = new Map<string, number>();
 		const playbackSent = new Map<string, { at: number; state: string }>();
 		const playbackCompleted = new Set<string>();
+		const playbackWarnings = new Set<string>();
 		let playbackQueue: Promise<void> = Promise.resolve();
 		let lastVideoPosition: PlaybackPosition | undefined;
 		let videoPlaybackId = "";
@@ -433,10 +434,18 @@ function init() {
 		function playbackKey(position: PlaybackPosition) {
 			return `${position.mediaId}:${position.episode}`;
 		}
+		function playbackWarning(key: string, message: string) {
+			if (playbackWarnings.has(key)) return;
+			playbackWarnings.add(key);
+			log.push("Warning", `Playback sync: ${message}`);
+		}
 
 		async function resolvePlaybackId(media: NonNullable<AniListEntry["media"]>) {
 			const malId = unwrap(media.idMal);
-			if (!malId) return undefined;
+			if (!malId) {
+				playbackWarning(`mal:${media.id}`, `skipped ${media.title?.userPreferred ?? media.id}: no MAL ID`);
+				return undefined;
+			}
 			const key = `${cleanBaseUrl()}:${malId}`;
 			if (playbackIds.has(key)) return playbackIds.get(key);
 			const list = await (await api("/public/api/me/list/anime")).json();
@@ -483,9 +492,16 @@ function init() {
 			enqueuePlayback(async () => {
 				if (state.token.get() !== token || cleanBaseUrl() !== baseUrl || fields.disableLiveSync.current.valueOf() || playbackCompleted.has(key)) return;
 				const entry = anilistEntries("anime").find((item) => unwrap(item.media?.id) === mediaId);
-				if (unwrap(entry?.private)) return;
+				if (unwrap(entry?.private)) {
+					playbackWarning(`private:${mediaId}`, "skipped private AniList entry");
+					return;
+				}
 				const media = entry?.media ?? (await ctx.anime.getAnimeEntry(mediaId)).media;
-				if (!media || (fields.skipAdult.current.valueOf() && unwrap(media.isAdult))) return;
+				if (!media) return;
+				if (fields.skipAdult.current.valueOf() && unwrap(media.isAdult)) {
+					playbackWarning(`adult:${mediaId}`, "skipped adult entry because the adult filter is enabled");
+					return;
+				}
 				const id = await resolvePlaybackId(media);
 				if (!id) return;
 				if (state.token.get() !== token || cleanBaseUrl() !== baseUrl || fields.disableLiveSync.current.valueOf() || playbackCompleted.has(key)) return;
@@ -495,6 +511,9 @@ function init() {
 						position_seconds: Math.min(seconds, duration), duration_seconds: duration,
 						state: position.state, source: "Seanime" }),
 				});
+				if (!previous || previous.state !== position.state) {
+					log.push("Success", `Playback: saved ${media.title?.userPreferred ?? id}, episode ${episode}, ${Math.floor(seconds)} / ${Math.floor(duration)} seconds (${position.state})`);
+				}
 			});
 		}
 
@@ -522,22 +541,35 @@ function init() {
 		}
 
 		function videoPosition(event: { playbackId: string; currentTime: number; duration: number; paused?: boolean }, forcedState?: PlaybackPosition["state"]) {
-			const info = ctx.videoCore.getCurrentPlaybackInfo();
-			if (!info || info.id !== event.playbackId) return;
+			let info = ctx.videoCore.getPlaybackState?.()?.playbackInfo;
+			if (!info) info = ctx.videoCore.getCurrentPlaybackInfo?.();
+			if (!info) {
+				playbackWarning("video-info", "player event received, but Seanime has no playback info yet");
+				return;
+			}
+			const eventId = unwrap(event.playbackId);
+			const infoId = unwrap(info.id);
+			if (infoId && eventId && infoId !== eventId) return;
 			const mediaId = unwrap(info.media?.id);
-			const episode = info.episode?.progressNumber ?? info.episode?.episodeNumber;
-			if (!mediaId || !episode) return;
-			if (videoPlaybackId !== event.playbackId) {
+			const progressNumber = unwrap(info.episode?.progressNumber);
+			const episode = progressNumber && progressNumber > 0 ? progressNumber : unwrap(info.episode?.episodeNumber);
+			if (!mediaId || !episode) {
+				playbackWarning(`episode:${infoId ?? eventId}`, "player event received, but anime or episode metadata is missing");
+				return;
+			}
+			const sessionId = eventId || infoId || `${mediaId}:${episode}`;
+			if (videoPlaybackId !== sessionId) {
 				if (lastVideoPosition) savePlayback({ ...lastVideoPosition, state: "stopped" });
-				videoPlaybackId = event.playbackId;
+				videoPlaybackId = sessionId;
 				playbackCompleted.delete(`${mediaId}:${episode}`);
 				playbackSent.delete(`${mediaId}:${episode}`);
 			}
-			lastVideoPosition = { mediaId, episode, position_seconds: event.currentTime,
-				duration_seconds: event.duration, state: forcedState ?? (event.paused ? "paused" : "playing") };
+			lastVideoPosition = { mediaId, episode, position_seconds: unwrap(event.currentTime) ?? NaN,
+				duration_seconds: unwrap(event.duration) ?? NaN, state: forcedState ?? (unwrap(event.paused) ? "paused" : "playing") };
 			savePlayback(lastVideoPosition);
 		}
 		try { if (ctx.videoCore?.addEventListener) {
+			ctx.videoCore.addEventListener("video-loaded-metadata", (event) => videoPosition(event));
 			ctx.videoCore.addEventListener("video-status", (event) => videoPosition(event));
 			ctx.videoCore.addEventListener("video-paused", (event) => videoPosition(event, "paused"));
 			ctx.videoCore.addEventListener("video-resumed", (event) => videoPosition(event, "playing"));
@@ -546,11 +578,13 @@ function init() {
 				videoPosition(event);
 			});
 			const stopped = (event: { playbackId: string }) => {
-				if (lastVideoPosition && event.playbackId === videoPlaybackId) savePlayback({ ...lastVideoPosition, state: "stopped" });
+				if (lastVideoPosition && (!event.playbackId || unwrap(event.playbackId) === videoPlaybackId)) savePlayback({ ...lastVideoPosition, state: "stopped" });
 			};
 			ctx.videoCore.addEventListener("video-ended", stopped);
 			ctx.videoCore.addEventListener("video-terminated", stopped);
-		} } catch (err) { log.push("Warning", `Built-in playback events unavailable: ${(err as Error).message}`); }
+			log.push("Info", "Playback: built-in player listeners registered");
+		} else { log.push("Warning", "Playback: this Seanime version has no built-in player event API"); }
+		} catch (err) { log.push("Warning", `Built-in playback events unavailable: ${(err as Error).message}`); }
 		try { if (ctx.playback?.registerEventListener) {
 			ctx.playback.registerEventListener((event) => {
 				const mediaId = event.state?.mediaId;

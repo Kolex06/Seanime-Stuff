@@ -123,5 +123,23 @@ function setup() {
   s.listeners['video-status'](s.event(1600));
   await s.context.flush();
   assert.equal(s.writes()[0].body.position_seconds, 1440);
+  s = setup();
+  s.context.ctx.videoCore.getCurrentPlaybackInfo = undefined;
+  s.context.ctx.videoCore.getPlaybackState = () => ({ playbackInfo: {
+    media: { ...s.entry.media, id: new Number(12) },
+    episode: { progressNumber: new Number(0), episodeNumber: new Number(3) },
+  } });
+  s.listeners['video-loaded-metadata']({ playbackId: new String('session-1'),
+    currentTime: new Number(10), duration: new Number(1440), paused: new Boolean(false) });
+  await s.context.flush();
+  assert.equal(s.writes()[0].body.episode, 3);
+  assert.equal(s.writes()[0].body.position_seconds, 10);
+  assert.equal(s.writes()[0].body.state, 'playing');
+  assert.ok(s.logs.some(([level, message]) => level === 'Success' && message.includes('Playback: saved')));
+  s = setup();
+  s.setInfo(undefined);
+  s.listeners['video-status']({ playbackId: 'session-1', currentTime: 10, duration: 1440 });
+  s.listeners['video-status']({ playbackId: 'session-1', currentTime: 11, duration: 1440 });
+  assert.equal(s.logs.filter(([level]) => level === 'Warning').length, 1);
   console.log('PASS: syntax, ID mapping, seconds, throttling, pause/seek/stop, cleanup, replay, privacy, disabled sync, invalid/stale events, external player');
 })().catch(error => { console.error(error); process.exitCode = 1; });
