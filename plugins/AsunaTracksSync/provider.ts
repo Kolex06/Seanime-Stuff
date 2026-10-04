@@ -583,7 +583,7 @@ function init() {
 			ctx.videoCore.addEventListener("video-ended", stopped);
 			ctx.videoCore.addEventListener("video-terminated", stopped);
 			log.push("Info", "Playback: built-in player listeners registered");
-		} else { log.push("Warning", "Playback: this Seanime version has no built-in player event API"); }
+		} else { log.push("Warning", "Playback: player API unavailable; check the extension's playback permission and reload it"); }
 		} catch (err) { log.push("Warning", `Built-in playback events unavailable: ${(err as Error).message}`); }
 		try { if (ctx.playback?.registerEventListener) {
 			ctx.playback.registerEventListener((event) => {

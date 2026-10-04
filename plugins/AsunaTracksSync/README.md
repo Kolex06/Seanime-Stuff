@@ -34,6 +34,12 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.27
+
+- Added the missing `playback` permission required for Seanime to expose built-in and external player APIs.
+- Corrected the unavailable-player warning to point to permissions instead of blaming the Seanime version.
+- Added a regression check for the playback permission in the extension manifest.
+
 ### 0.1.26
 
 - Read built-in player metadata from playback state, with a fallback to the playback-info getter.

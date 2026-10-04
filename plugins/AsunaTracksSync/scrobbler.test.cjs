@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { stripTypeScriptTypes } = require('node:module');
 const source = fs.readFileSync(process.argv[2] || require('node:path').join(__dirname, 'provider.ts'), 'utf8');
+const manifest = JSON.parse(fs.readFileSync(require('node:path').join(__dirname, '..', 'asunatracks-sync.json'), 'utf8'));
+assert.ok(manifest.plugin.permissions.scopes.includes('playback'), 'Seanime requires the playback scope to expose ctx.videoCore and ctx.playback');
 const compiled = stripTypeScriptTypes(source);
 new vm.Script(compiled);
 const block = source.slice(source.indexOf('\t\ttype PlaybackPosition'), source.indexOf('\t\tasync function pushEntry'));
