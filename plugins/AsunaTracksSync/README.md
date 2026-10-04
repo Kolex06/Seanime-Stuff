@@ -34,6 +34,12 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.24
+
+- Made log timestamps readable in local time with an explicit UTC offset; older saved log timestamps are formatted too.
+- Kept the session and showed a connection warning when startup token checks fail due to DNS, timeouts, or server errors. Only an HTTP 401 asks users to sign in again.
+- Included failed network requests in the connection failure counter.
+
 ### 0.1.23
 
 - Added Playback Progress / Scrobbler integration with `/public/api/me/playback-progress`.

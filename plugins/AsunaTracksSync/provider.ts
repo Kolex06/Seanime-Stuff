@@ -35,6 +35,27 @@ type AsunaTracksPayload = {
 	finish_date?: string;
 };
 
+function readableLogTimestamp(date: Date): string {
+	const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+	const pad = (value: number) => String(value).padStart(2, "0");
+	const offset = -date.getTimezoneOffset();
+	const zone = `UTC${offset >= 0 ? "+" : "-"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+	return `${pad(date.getDate())} ${months[date.getMonth()]} ${date.getFullYear()}, ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} (${zone})`;
+}
+
+function readableLogLine(message: string): string {
+	return message.replace(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?= \|)/, (timestamp) => {
+		const date = new Date(`${timestamp}Z`);
+		return Number.isNaN(date.getTime()) ? timestamp : readableLogTimestamp(date);
+	});
+}
+
+function tokenCheckFailure(error: Error & { status?: number }) {
+	if (error.status === 401) return { status: "Please sign in again", level: "Error" as const, message: `Session expired: ${error.message}` };
+	return { status: "Unable to check connection; session kept", level: "Warning" as const,
+		message: `Could not verify token; session kept: ${error.message}` };
+}
+
 // @ts-ignore
 function init() {
 
@@ -85,11 +106,11 @@ function init() {
 			open: ctx.state<boolean>(false),
 			push(level: "Info" | "Success" | "Warning" | "Error", message: string) {
 				const entries = ($storage.get<[string, string][]>(this.id) ?? []).slice(-199);
-				entries.push([`${new Date().toISOString().slice(0, 19)} | ${level.padEnd(7, " ")} | ${message}`, level]);
+				entries.push([`${readableLogTimestamp(new Date())} | ${level.padEnd(7, " ")} | ${message}`, level]);
 				$storage.set(this.id, entries);
 			},
 			entries() {
-				return this.open.get() ? ($storage.get<[string, string][]>(this.id) ?? []) : [];
+				return this.open.get() ? ($storage.get<[string, string][]>(this.id) ?? []).map(([message, level]) => [readableLogLine(message), level] as [string, string]) : [];
 			},
 			clear() {
 				$storage.set(this.id, []);
@@ -201,10 +222,14 @@ function init() {
 			const token = state.token.get();
 			if (token) headers.Authorization = `Bearer ${token}`;
 
-			const res = await ctx.fetch(`${cleanBaseUrl()}${path}`, {
+			let res;
+			try { res = await ctx.fetch(`${cleanBaseUrl()}${path}`, {
 				...init,
 				headers,
-			} as FetchOptions);
+			} as FetchOptions); } catch (error) {
+				updateCounters(false);
+				throw error;
+			}
 
 			updateCounters(res.ok);
 			if (!res.ok) {
@@ -214,7 +239,9 @@ function init() {
 					message = body?.error || body?.message || message;
 				} catch {}
 				if (res.status === 401) setToken(null, null);
-				throw new Error(message || `Request failed (${res.status})`);
+				const error: Error & { status?: number } = new Error(message || `Request failed (${res.status})`);
+				error.status = res.status;
+				throw error;
 			}
 			return res;
 		}
@@ -1182,8 +1209,9 @@ function init() {
 				})
 				.catch((err) => {
 					state.lastError.set((err as Error).message);
-					state.status.set("Please sign in again");
-					log.push("Error", `Token check failed: ${(err as Error).message}`);
+					const failure = tokenCheckFailure(err);
+					state.status.set(failure.status);
+					log.push(failure.level, failure.message);
 				});
 		}
 	});
