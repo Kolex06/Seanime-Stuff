@@ -8,6 +8,7 @@ Keep AsunaTracks up to date from Seanime. The extension can live-sync list edits
 
 - Signs in with an AsunaTracks account through `/public/api/auth/login`.
 - Live-syncs Seanime entry updates, progress updates, repeat counts, and deletes.
+- Saves unfinished anime playback positions to AsunaTracks Playback Progress / Scrobbler from Seanime's built-in player and tracked external players.
 - Manually pushes the current AniList anime or manga collection into AsunaTracks.
 - Uses MAL IDs from AniList as the bridge, so AsunaTracks can resolve or import media through its public API.
 - Shows a compact tray UI with notifications, logs, profile menu, manual sync buttons, and live-sync toggles.
@@ -28,8 +29,17 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 - Seanime/AniList media is matched to AsunaTracks through MAL IDs when available.
 - Private AniList entries are skipped during sync.
 - You can disable live sync from the tray at any time without signing out.
+- Playback positions update every 15 seconds and on pause, resume, seek, or stop. They use the `Seanime` source label. Successful watched-progress updates clear saved positions for watched episodes; saving a position alone does not mark an episode watched.
+- Playback requires a title with a MAL ID that can be matched to AsunaTracks. Private and excluded adult entries are skipped. Player versions without playback event support still use normal list sync.
 
 ## Version History
+
+### 0.1.23
+
+- Added Playback Progress / Scrobbler integration with `/public/api/me/playback-progress`.
+- Added built-in and tracked external player position updates, including pause, resume, seek, and stop.
+- Matched MAL IDs to AsunaTracks media IDs before saving positions, and used seconds for position and duration.
+- Cleared watched positions after successful progress sync without changing Seanime's watched threshold or rating behavior.
 
 ### 0.1.22
 

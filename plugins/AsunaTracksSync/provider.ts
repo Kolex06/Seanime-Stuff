@@ -387,6 +387,170 @@ function init() {
 			});
 		}
 
+		type PlaybackPosition = {
+			mediaId: number;
+			episode: number;
+			position_seconds: number;
+			duration_seconds: number;
+			state: "playing" | "paused" | "stopped";
+		};
+		const playbackIds = new Map<string, number>();
+		const playbackSent = new Map<string, { at: number; state: string }>();
+		const playbackCompleted = new Set<string>();
+		let playbackQueue: Promise<void> = Promise.resolve();
+		let lastVideoPosition: PlaybackPosition | undefined;
+		let videoPlaybackId = "";
+		let externalPosition: PlaybackPosition | undefined;
+		let externalStarted = false;
+
+		function playbackKey(position: PlaybackPosition) {
+			return `${position.mediaId}:${position.episode}`;
+		}
+
+		async function resolvePlaybackId(media: NonNullable<AniListEntry["media"]>) {
+			const malId = unwrap(media.idMal);
+			if (!malId) return undefined;
+			const key = `${cleanBaseUrl()}:${malId}`;
+			if (playbackIds.has(key)) return playbackIds.get(key);
+			const list = await (await api("/public/api/me/list/anime")).json();
+			for (const item of list.items ?? []) {
+				if (item.media?.mal_id && item.media?.id) {
+					playbackIds.set(`${cleanBaseUrl()}:${item.media.mal_id}`, item.media.id);
+				}
+			}
+			if (playbackIds.has(key)) return playbackIds.get(key);
+			const title = media.title?.romaji ?? media.title?.userPreferred;
+			if (!title) return undefined;
+			let page = 1;
+			while (page <= 10) {
+				const result = await (await api(`/public/api/anime?q=${encodeURIComponent(title)}&limit=50&page=${page}`)).json();
+				const match = (result.items ?? []).find((item: any) => Number(item.mal_id) === malId);
+				if (match?.id) {
+					playbackIds.set(key, match.id);
+					return match.id;
+				}
+				if (!result.has_next) break;
+				page++;
+			}
+			throw new Error(`Playback title not found in AsunaTracks: ${title}`);
+		}
+
+		function enqueuePlayback(work: () => Promise<void>) {
+			playbackQueue = playbackQueue.then(work).catch((err) => {
+				log.push("Warning", `Playback sync: ${(err as Error).message}`);
+			});
+		}
+
+		function savePlayback(position: PlaybackPosition) {
+			if (!state.token.get() || fields.disableLiveSync.current.valueOf()) return;
+			const { mediaId, episode, position_seconds: seconds, duration_seconds: duration } = position;
+			if (isCustomSource(mediaId) || !Number.isInteger(episode) || episode < 1 ||
+				!Number.isFinite(seconds) || !Number.isFinite(duration) || seconds < 0 || duration <= 0 || duration > 86400) return;
+			const key = playbackKey(position);
+			if (playbackCompleted.has(key)) return;
+			const previous = playbackSent.get(key);
+			if (previous?.state === position.state && Date.now() - previous.at < 15000) return;
+			playbackSent.set(key, { at: Date.now(), state: position.state });
+			const token = state.token.get();
+			const baseUrl = cleanBaseUrl();
+			enqueuePlayback(async () => {
+				if (state.token.get() !== token || cleanBaseUrl() !== baseUrl || fields.disableLiveSync.current.valueOf() || playbackCompleted.has(key)) return;
+				const entry = anilistEntries("anime").find((item) => unwrap(item.media?.id) === mediaId);
+				if (unwrap(entry?.private)) return;
+				const media = entry?.media ?? (await ctx.anime.getAnimeEntry(mediaId)).media;
+				if (!media || (fields.skipAdult.current.valueOf() && unwrap(media.isAdult))) return;
+				const id = await resolvePlaybackId(media);
+				if (!id) return;
+				if (state.token.get() !== token || cleanBaseUrl() !== baseUrl || fields.disableLiveSync.current.valueOf() || playbackCompleted.has(key)) return;
+				await api("/public/api/me/playback-progress", {
+					method: "POST",
+					body: JSON.stringify({ action: "save", media_id: id, episode,
+						position_seconds: Math.min(seconds, duration), duration_seconds: duration,
+						state: position.state, source: "Seanime" }),
+				});
+			});
+		}
+
+		function clearWatchedPlayback(mediaId: number, progress: number) {
+			const positions = [lastVideoPosition, externalPosition].filter((item): item is PlaybackPosition =>
+				!!item && item.mediaId === mediaId && item.episode <= progress);
+			for (const position of positions) playbackCompleted.add(playbackKey(position));
+			const token = state.token.get();
+			const baseUrl = cleanBaseUrl();
+			enqueuePlayback(async () => {
+				if (state.token.get() !== token || cleanBaseUrl() !== baseUrl) return;
+				const entry = anilistEntries("anime").find((item) => unwrap(item.media?.id) === mediaId);
+				if (!entry?.media) return;
+				const id = await resolvePlaybackId(entry.media);
+				if (!id) return;
+				const data = await (await api("/public/api/me/playback-progress")).json();
+				if (state.token.get() !== token || cleanBaseUrl() !== baseUrl || fields.disableLiveSync.current.valueOf()) return;
+				const items = (data.items ?? []).filter((item: any) => Number(item.media_id) === id && item.episode <= progress)
+					.map((item: any) => ({ media_id: id, episode: item.episode }));
+				for (let offset = 0; offset < items.length; offset += 100) {
+					await api("/public/api/me/playback-progress", { method: "POST",
+						body: JSON.stringify({ action: "remove", items: items.slice(offset, offset + 100) }) });
+				}
+			});
+		}
+
+		function videoPosition(event: { playbackId: string; currentTime: number; duration: number; paused?: boolean }, forcedState?: PlaybackPosition["state"]) {
+			const info = ctx.videoCore.getCurrentPlaybackInfo();
+			if (!info || info.id !== event.playbackId) return;
+			const mediaId = unwrap(info.media?.id);
+			const episode = info.episode?.progressNumber ?? info.episode?.episodeNumber;
+			if (!mediaId || !episode) return;
+			if (videoPlaybackId !== event.playbackId) {
+				if (lastVideoPosition) savePlayback({ ...lastVideoPosition, state: "stopped" });
+				videoPlaybackId = event.playbackId;
+				playbackCompleted.delete(`${mediaId}:${episode}`);
+				playbackSent.delete(`${mediaId}:${episode}`);
+			}
+			lastVideoPosition = { mediaId, episode, position_seconds: event.currentTime,
+				duration_seconds: event.duration, state: forcedState ?? (event.paused ? "paused" : "playing") };
+			savePlayback(lastVideoPosition);
+		}
+		try { if (ctx.videoCore?.addEventListener) {
+			ctx.videoCore.addEventListener("video-status", (event) => videoPosition(event));
+			ctx.videoCore.addEventListener("video-paused", (event) => videoPosition(event, "paused"));
+			ctx.videoCore.addEventListener("video-resumed", (event) => videoPosition(event, "playing"));
+			ctx.videoCore.addEventListener("video-seeked", (event) => {
+				if (lastVideoPosition) playbackSent.delete(playbackKey(lastVideoPosition));
+				videoPosition(event);
+			});
+			const stopped = (event: { playbackId: string }) => {
+				if (lastVideoPosition && event.playbackId === videoPlaybackId) savePlayback({ ...lastVideoPosition, state: "stopped" });
+			};
+			ctx.videoCore.addEventListener("video-ended", stopped);
+			ctx.videoCore.addEventListener("video-terminated", stopped);
+		} } catch (err) { log.push("Warning", `Built-in playback events unavailable: ${(err as Error).message}`); }
+		try { if (ctx.playback?.registerEventListener) {
+			ctx.playback.registerEventListener((event) => {
+				const mediaId = event.state?.mediaId;
+				const episode = event.state?.episodeNumber;
+				if (event.isVideoStarted || event.isStreamStarted) {
+					if (externalPosition) savePlayback({ ...externalPosition, state: "stopped" });
+					if (mediaId && episode) {
+						playbackCompleted.delete(`${mediaId}:${episode}`);
+						playbackSent.delete(`${mediaId}:${episode}`);
+					}
+					externalPosition = undefined;
+					externalStarted = true;
+				}
+				if (mediaId && episode && event.status?.durationInSeconds > 0) {
+					if (externalStarted) {
+						playbackCompleted.delete(`${mediaId}:${episode}`);
+						playbackSent.delete(`${mediaId}:${episode}`);
+						externalStarted = false;
+					}
+					externalPosition = { mediaId, episode, position_seconds: event.status.currentTimeInSeconds,
+						duration_seconds: event.status.durationInSeconds, state: event.status.playing ? "playing" : "paused" };
+				}
+				if (externalPosition) savePlayback({ ...externalPosition,
+					state: event.isVideoStopped || event.isStreamStopped ? "stopped" : externalPosition.state });
+			});
+		} } catch (err) { log.push("Warning", `External playback events unavailable: ${(err as Error).message}`); }
+
 		async function pushEntry(type: MediaType, entry: AniListEntry, reason: string, overrides: Partial<AsunaTracksPayload> = {}) {
 			if (!state.token.get()) {
 				log.push("Warning", `${reason}: skipped because AsunaTracks is not signed in`);
@@ -430,6 +594,9 @@ function init() {
 				});
 			}
 			log.push("Success", `${reason}: synced ${entry.media?.title?.userPreferred ?? body.mal_id}`);
+			if (type === "anime" && reason !== "manual" && typeof body.progress === "number" && body.progress > 0 && entry.media?.id) {
+				clearWatchedPlayback(entry.media.id, body.progress);
+			}
 			notifySync(`Updated ${entry.media?.title?.userPreferred ?? body.mal_id}`, entry, {
 				Action: reason,
 				Type: type,
