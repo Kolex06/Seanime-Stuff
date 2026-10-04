@@ -22,7 +22,7 @@ After adding or changing the marketplace URL, refresh the catalog or run `Check 
 | AniList Notifications Kolex06-Version | 1.0.18 | `AniList-Notifications-Kolex06-Version` | Sidebar panel for AniList notifications with larger cards, transparent styling, detail popups, and AniList page links. |
 | Account Switcher Kolex06-Version | 1.0.10 | `Account-Switcher-Kolex06-Version` | AniList account switcher moved from the tray into Seanime's avatar dropdown menu. |
 | Watch Next Kolex06-Version | 1.0.7 | `Watch-Next-Kolex06-Version` | Kolex06-styled sidebar Watch Next queue with drag-handle anime ordering and two-way AniList Watch Next sync. |
-| AsunaTracks Sync | 0.1.24 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
+| AsunaTracks Sync | 0.1.25 | `asunatracks-sync` | Syncs Seanime/AniList anime and manga progress to AsunaTracks, with live sync and manual full-library sync options. |
 
 ## SeaUtils Kolex06-Version
 

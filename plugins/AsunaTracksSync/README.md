@@ -34,6 +34,11 @@ Then open the AsunaTracks Sync tray icon, sign in with your AsunaTracks account,
 
 ## Version History
 
+### 0.1.25
+
+- Fixed `readableLogTimestamp is not defined` by defining log helpers inside Seanime's isolated UI callback.
+- Added a regression test that runs the serialized UI callback in a separate runtime.
+
 ### 0.1.24
 
 - Made log timestamps readable in local time with an explicit UTC offset; older saved log timestamps are formatted too.

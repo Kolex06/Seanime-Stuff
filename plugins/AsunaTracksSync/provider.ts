@@ -35,31 +35,31 @@ type AsunaTracksPayload = {
 	finish_date?: string;
 };
 
-function readableLogTimestamp(date: Date): string {
-	const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-	const pad = (value: number) => String(value).padStart(2, "0");
-	const offset = -date.getTimezoneOffset();
-	const zone = `UTC${offset >= 0 ? "+" : "-"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
-	return `${pad(date.getDate())} ${months[date.getMonth()]} ${date.getFullYear()}, ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} (${zone})`;
-}
-
-function readableLogLine(message: string): string {
-	return message.replace(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?= \|)/, (timestamp) => {
-		const date = new Date(`${timestamp}Z`);
-		return Number.isNaN(date.getTime()) ? timestamp : readableLogTimestamp(date);
-	});
-}
-
-function tokenCheckFailure(error: Error & { status?: number }) {
-	if (error.status === 401) return { status: "Please sign in again", level: "Error" as const, message: `Session expired: ${error.message}` };
-	return { status: "Unable to check connection; session kept", level: "Warning" as const,
-		message: `Could not verify token; session kept: ${error.message}` };
-}
-
 // @ts-ignore
 function init() {
 
 	$ui.register((ctx) => {
+		function readableLogTimestamp(date: Date): string {
+			const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+			const pad = (value: number) => String(value).padStart(2, "0");
+			const offset = -date.getTimezoneOffset();
+			const zone = `UTC${offset >= 0 ? "+" : "-"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+			return `${pad(date.getDate())} ${months[date.getMonth()]} ${date.getFullYear()}, ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} (${zone})`;
+		}
+
+		function readableLogLine(message: string): string {
+			return message.replace(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?= \|)/, (timestamp) => {
+				const date = new Date(`${timestamp}Z`);
+				return Number.isNaN(date.getTime()) ? timestamp : readableLogTimestamp(date);
+			});
+		}
+
+		function tokenCheckFailure(error: Error & { status?: number }) {
+			if (error.status === 401) return { status: "Please sign in again", level: "Error" as const, message: `Session expired: ${error.message}` };
+			return { status: "Unable to check connection; session kept", level: "Warning" as const,
+				message: `Could not verify token; session kept: ${error.message}` };
+		}
+
 		const iconUrl = "https://asunatracks.space/static/asunatracks-logo.png";
 		const theme = {
 			bg: "#050b1a",
